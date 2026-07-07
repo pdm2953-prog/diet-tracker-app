@@ -30,6 +30,7 @@ export type MealFood = {
   id: string;
   foodId: string;
   mealId: string;
+  quantity: number;
   amount: number;
   amountUnit: string;
   checked: boolean;

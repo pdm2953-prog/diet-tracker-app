@@ -1,11 +1,14 @@
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { GestureResponderEvent } from 'react-native';
 import {
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -23,10 +26,16 @@ import {
   dailyTargets,
   formatNutritionNumber,
   formatNutritionValue,
+  multiplyNutritionByQuantity,
   nutritionLabels,
   nutritionUnits,
   primaryNutritionFields,
 } from './src/nutrition';
+import {
+  FOOD_SEARCH_RESULT_LIMIT,
+  mockFoodSearchProvider,
+} from './src/services/foodSearch';
+import type { FoodSearchResult } from './src/services/foodSearch';
 
 const mealLabels: Record<MealType, string> = {
   breakfast: '아침',
@@ -34,12 +43,48 @@ const mealLabels: Record<MealType, string> = {
   dinner: '저녁',
 };
 
+let mealFoodIdSequence = 0;
+
 type PrimaryNutritionField = (typeof primaryNutritionFields)[number];
 
 function isPrimaryNutritionField(
   field: NutritionField,
 ): field is PrimaryNutritionField {
   return (primaryNutritionFields as readonly NutritionField[]).includes(field);
+}
+
+function createMealFoodId(foodId: string): string {
+  mealFoodIdSequence += 1;
+
+  return `meal-food-${foodId}-${Date.now()}-${mealFoodIdSequence}`;
+}
+
+function formatAmountLabel(amount: number): string {
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(1);
+}
+
+function formatServingText(food: Food): string {
+  if (!hasValidServing(food)) {
+    return '제공량 정보 없음';
+  }
+
+  return `${formatAmountLabel(food.servingSize)} ${food.servingUnit}`;
+}
+
+function hasValidServing(
+  food: Food,
+): food is Food & { servingSize: number; servingUnit: string } {
+  return food.servingSize !== null && Number.isFinite(food.servingSize) && food.servingSize > 0 && food.servingUnit !== null;
+}
+
+function getMissingPrimaryFields(
+  nutrition: Food['nutritionPerServing'],
+): PrimaryNutritionField[] {
+  return primaryNutritionFields.filter((field) => nutrition[field] === null);
+}
+
+function normalizeQuantity(quantity: number): number {
+  return Number.isFinite(quantity) && quantity > 0 ? Math.floor(quantity) : 1;
 }
 
 function getLocalDateString(): string {
@@ -60,14 +105,21 @@ function formatDateLabel(date: string): string {
 export default function App() {
   const today = useMemo(() => getLocalDateString(), []);
   const mockData = useMemo(() => createMockTodayData(today), [today]);
+  const [foods, setFoods] = useState<Food[]>(() => mockData.foods);
+  const [meals, setMeals] = useState<Meal[]>(() => mockData.meals);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<FoodSearchResult[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [activeSearchMealType, setActiveSearchMealType] = useState<MealType | null>(null);
   const foodsById = useMemo<Record<string, Food>>(
     () =>
       Object.fromEntries(
-        mockData.foods.map((food) => [food.id, food]),
+        foods.map((food) => [food.id, food]),
       ) as Record<string, Food>,
-    [mockData.foods],
+    [foods],
   );
-  const [meals, setMeals] = useState<Meal[]>(() => mockData.meals);
   const dailySummary = useMemo(
     () => buildDailySummary(today, meals),
     [meals, today],
@@ -90,6 +142,206 @@ export default function App() {
               ? { ...mealFood, checked: !mealFood.checked, updatedAt }
               : mealFood,
           ),
+        };
+      }),
+    );
+  };
+
+  const resetFoodSearchState = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setHasSearched(false);
+    setIsSearching(false);
+    setSearchError(null);
+  };
+
+  const openFoodSearch = (mealType: MealType) => {
+    setActiveSearchMealType(mealType);
+    resetFoodSearchState();
+  };
+
+  const closeFoodSearch = () => {
+    setActiveSearchMealType(null);
+    resetFoodSearchState();
+  };
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+
+    if (activeSearchMealType === null || query.length === 0) {
+      setHasSearched(false);
+      setIsSearching(false);
+      setSearchError(null);
+      setSearchResults([]);
+      return;
+    }
+
+    let isCurrent = true;
+
+    setHasSearched(true);
+    setIsSearching(true);
+    setSearchError(null);
+
+    mockFoodSearchProvider
+      .searchFoods(query, { limit: FOOD_SEARCH_RESULT_LIMIT })
+      .then((results) => {
+        if (isCurrent) {
+          setSearchResults(results);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setSearchError('검색 중 오류가 발생했습니다.');
+          setSearchResults([]);
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsSearching(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [activeSearchMealType, searchQuery]);
+
+  const addFoodToMeal = (food: FoodSearchResult, mealType: MealType) => {
+    if (!hasValidServing(food)) {
+      return;
+    }
+
+    const updatedAt = new Date().toISOString();
+
+    setFoods((currentFoods) =>
+      currentFoods.some((currentFood) => currentFood.id === food.id)
+        ? currentFoods
+        : [...currentFoods, food],
+    );
+
+    setMeals((currentMeals) =>
+      currentMeals.map((meal) => {
+        if (meal.type !== mealType) {
+          return meal;
+        }
+
+        const matchingMealFoods = meal.foods.filter(
+          (mealFood) => mealFood.foodId === food.id,
+        );
+
+        if (matchingMealFoods.length > 0) {
+          const [firstMatchingMealFood] = matchingMealFoods;
+          const mergedQuantity = matchingMealFoods.reduce(
+            (totalQuantity, mealFood) =>
+              totalQuantity + normalizeQuantity(mealFood.quantity),
+            1,
+          );
+          const mergedChecked = matchingMealFoods.some((mealFood) => mealFood.checked);
+
+          return {
+            ...meal,
+            updatedAt,
+            foods: meal.foods.reduce<MealFood[]>((updatedFoods, mealFood) => {
+              if (mealFood.foodId !== food.id) {
+                return [...updatedFoods, mealFood];
+              }
+
+              if (mealFood.id !== firstMatchingMealFood.id) {
+                return updatedFoods;
+              }
+
+              return [
+                ...updatedFoods,
+                {
+                  ...mealFood,
+                  quantity: mergedQuantity,
+                  checked: mergedChecked,
+                  updatedAt,
+                },
+              ];
+            }, []),
+          };
+        }
+
+        const mealFood: MealFood = {
+          id: createMealFoodId(food.id),
+          foodId: food.id,
+          mealId: meal.id,
+          quantity: 1,
+          amount: food.servingSize,
+          amountUnit: food.servingUnit,
+          checked: true,
+          calculatedNutrition: { ...food.nutritionPerServing },
+          createdAt: updatedAt,
+          updatedAt,
+        };
+
+        return {
+          ...meal,
+          updatedAt,
+          foods: [...meal.foods, mealFood],
+        };
+      }),
+    );
+  };
+
+  const increaseMealFoodQuantity = (mealId: string, mealFoodId: string) => {
+    const updatedAt = new Date().toISOString();
+
+    setMeals((currentMeals) =>
+      currentMeals.map((meal) => {
+        if (meal.id !== mealId) {
+          return meal;
+        }
+
+        return {
+          ...meal,
+          updatedAt,
+          foods: meal.foods.map((mealFood) =>
+            mealFood.id === mealFoodId
+              ? {
+                  ...mealFood,
+                  quantity: normalizeQuantity(mealFood.quantity) + 1,
+                  updatedAt,
+                }
+              : mealFood,
+          ),
+        };
+      }),
+    );
+  };
+
+  const decreaseMealFoodQuantity = (mealId: string, mealFoodId: string) => {
+    const updatedAt = new Date().toISOString();
+
+    setMeals((currentMeals) =>
+      currentMeals.map((meal) => {
+        if (meal.id !== mealId) {
+          return meal;
+        }
+
+        return {
+          ...meal,
+          updatedAt,
+          foods: meal.foods.flatMap((mealFood) => {
+            if (mealFood.id !== mealFoodId) {
+              return [mealFood];
+            }
+
+            const quantity = normalizeQuantity(mealFood.quantity);
+
+            if (quantity <= 1) {
+              return [];
+            }
+
+            return [
+              {
+                ...mealFood,
+                quantity: quantity - 1,
+                updatedAt,
+              },
+            ];
+          }),
         };
       }),
     );
@@ -140,7 +392,25 @@ export default function App() {
               key={meal.id}
               foodsById={foodsById}
               meal={meal}
+              onDecreaseQuantity={decreaseMealFoodQuantity}
+              onIncreaseQuantity={increaseMealFoodQuantity}
+              onOpenSearch={openFoodSearch}
               onToggle={toggleMealFood}
+              searchPanel={
+                activeSearchMealType === meal.type ? (
+                  <FoodSearchPanel
+                    hasSearched={hasSearched}
+                    isSearching={isSearching}
+                    mealType={meal.type}
+                    onClose={closeFoodSearch}
+                    onQueryChange={setSearchQuery}
+                    onSelectFood={(food) => addFoodToMeal(food, meal.type)}
+                    query={searchQuery}
+                    results={searchResults}
+                    searchError={searchError}
+                  />
+                ) : null
+              }
               summary={dailySummary.mealSummaries.find(
                 (mealSummary) => mealSummary.mealId === meal.id,
               )}
@@ -215,14 +485,170 @@ function ProgressMetric({ field, isMissing, value }: ProgressMetricProps) {
   );
 }
 
+type FoodSearchPanelProps = {
+  hasSearched: boolean;
+  isSearching: boolean;
+  mealType: MealType;
+  onClose: () => void;
+  onQueryChange: (query: string) => void;
+  onSelectFood: (food: FoodSearchResult) => void;
+  query: string;
+  results: FoodSearchResult[];
+  searchError: string | null;
+};
+
+function FoodSearchPanel({
+  hasSearched,
+  isSearching,
+  mealType,
+  onClose,
+  onQueryChange,
+  onSelectFood,
+  query,
+  results,
+  searchError,
+}: FoodSearchPanelProps) {
+  return (
+    <View style={styles.searchPanel}>
+      <View style={styles.searchHeader}>
+        <Text style={styles.sectionTitle}>{mealLabels[mealType]} 음식 추가</Text>
+        <Pressable
+          accessibilityLabel="음식 검색 닫기"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={({ pressed }) => [
+            styles.searchCloseButton,
+            pressed ? styles.searchCloseButtonPressed : null,
+          ]}
+        >
+          <Text style={styles.searchCloseButtonText}>닫기</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.searchInputRow}>
+        <TextInput
+          accessibilityLabel={`${mealLabels[mealType]} 음식명 입력`}
+          autoFocus
+          onChangeText={onQueryChange}
+          placeholder={`${mealLabels[mealType]} 음식명 입력`}
+          placeholderTextColor="#8b9588"
+          returnKeyType="search"
+          style={styles.searchInput}
+          value={query}
+        />
+      </View>
+
+      {isSearching ? <Text style={styles.searchMessageText}>검색 중</Text> : null}
+
+      {searchError !== null ? (
+        <Text style={styles.searchErrorText}>{searchError}</Text>
+      ) : null}
+
+      {hasSearched && !isSearching && searchError === null && results.length === 0 ? (
+        <Text style={styles.searchMessageText}>검색 결과 없음</Text>
+      ) : null}
+
+      {results.length > 0 ? (
+        <View style={styles.searchResultList}>
+          {results.map((food) => (
+            <FoodSearchResultCard
+              key={food.id}
+              food={food}
+              onSelectFood={onSelectFood}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+type FoodSearchResultCardProps = {
+  food: FoodSearchResult;
+  onSelectFood: (food: FoodSearchResult) => void;
+};
+
+function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps) {
+  const missingPrimaryFields = getMissingPrimaryFields(food.nutritionPerServing);
+  const canAddFood = hasValidServing(food);
+
+  return (
+    <View style={styles.searchResultCard}>
+      <View style={styles.searchResultHeader}>
+        <View style={styles.searchResultTitleBlock}>
+          <Text style={styles.searchResultName}>{food.name}</Text>
+          <Text style={styles.searchResultMeta}>
+            {food.category ?? '분류 없음'} · 제공량 {formatServingText(food)}
+          </Text>
+        </View>
+        {!canAddFood ? (
+          <Text style={styles.resultWarning}>추가 불가</Text>
+        ) : missingPrimaryFields.length > 0 ? (
+          <Text style={styles.resultWarning}>일부 영양정보 없음</Text>
+        ) : null}
+      </View>
+
+      <View style={styles.searchNutritionGrid}>
+        {primaryNutritionFields.map((field) => (
+          <View key={field} style={styles.searchNutritionItem}>
+            <Text style={styles.searchNutritionLabel}>{nutritionLabels[field]}</Text>
+            <Text style={styles.searchNutritionValue}>
+              {formatNutritionValue(field, food.nutritionPerServing[field])}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <Pressable
+        accessibilityLabel={canAddFood ? `${food.name} 추가` : `${food.name} 추가 불가`}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !canAddFood }}
+        disabled={!canAddFood}
+        onPress={() => {
+          if (canAddFood) {
+            onSelectFood(food);
+          }
+        }}
+        style={({ pressed }) => [
+          styles.selectFoodButton,
+          !canAddFood ? styles.selectFoodButtonDisabled : null,
+          pressed && canAddFood ? styles.selectFoodButtonPressed : null,
+        ]}
+      >
+        <Text
+          style={[
+            styles.selectFoodButtonText,
+            !canAddFood ? styles.selectFoodButtonDisabledText : null,
+          ]}
+        >
+          {canAddFood ? '추가' : '추가 불가'}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 type MealSectionProps = {
   foodsById: Record<string, Food>;
   meal: Meal;
+  onDecreaseQuantity: (mealId: string, mealFoodId: string) => void;
+  onIncreaseQuantity: (mealId: string, mealFoodId: string) => void;
+  onOpenSearch: (mealType: MealType) => void;
   onToggle: (mealId: string, mealFoodId: string) => void;
+  searchPanel: ReactNode;
   summary: MealSummary | null | undefined;
 };
 
-function MealSection({ foodsById, meal, onToggle, summary }: MealSectionProps) {
+function MealSection({
+  foodsById,
+  meal,
+  onDecreaseQuantity,
+  onIncreaseQuantity,
+  onOpenSearch,
+  onToggle,
+  searchPanel,
+  summary,
+}: MealSectionProps) {
   const calories = summary?.checkedNutritionTotal.caloriesKcal ?? null;
   const protein = summary?.checkedNutritionTotal.proteinG ?? null;
 
@@ -230,7 +656,20 @@ function MealSection({ foodsById, meal, onToggle, summary }: MealSectionProps) {
     <View style={styles.mealSection}>
       <View style={styles.mealHeader}>
         <View>
-          <Text style={styles.mealTitle}>{mealLabels[meal.type]}</Text>
+          <View style={styles.mealTitleRow}>
+            <Text style={styles.mealTitle}>{mealLabels[meal.type]}</Text>
+            <Pressable
+              accessibilityLabel={`${mealLabels[meal.type]} 음식 추가`}
+              accessibilityRole="button"
+              onPress={() => onOpenSearch(meal.type)}
+              style={({ pressed }) => [
+                styles.openSearchButton,
+                pressed ? styles.openSearchButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.openSearchButtonText}>+</Text>
+            </Pressable>
+          </View>
           <Text style={styles.mealStatus}>
             {summary?.checkedCount ?? 0}/{summary?.totalCount ?? meal.foods.length}개 체크
           </Text>
@@ -251,16 +690,24 @@ function MealSection({ foodsById, meal, onToggle, summary }: MealSectionProps) {
         </Text>
       </View>
 
+      {searchPanel}
+
       <View style={styles.foodList}>
-        {meal.foods.map((mealFood, index) => (
-          <FoodRow
-            key={mealFood.id}
-            food={foodsById[mealFood.foodId]}
-            isLast={index === meal.foods.length - 1}
-            mealFood={mealFood}
-            onPress={() => onToggle(meal.id, mealFood.id)}
-          />
-        ))}
+        {meal.foods.length > 0 ? (
+          meal.foods.map((mealFood, index) => (
+            <FoodRow
+              key={mealFood.id}
+              food={foodsById[mealFood.foodId]}
+              isLast={index === meal.foods.length - 1}
+              mealFood={mealFood}
+              onDecreaseQuantity={() => onDecreaseQuantity(meal.id, mealFood.id)}
+              onIncreaseQuantity={() => onIncreaseQuantity(meal.id, mealFood.id)}
+              onPress={() => onToggle(meal.id, mealFood.id)}
+            />
+          ))
+        ) : (
+          <Text style={styles.emptyMealText}>추가된 음식 없음</Text>
+        )}
       </View>
     </View>
   );
@@ -270,13 +717,36 @@ type FoodRowProps = {
   food: Food | undefined;
   isLast: boolean;
   mealFood: MealFood;
+  onDecreaseQuantity: () => void;
+  onIncreaseQuantity: () => void;
   onPress: () => void;
 };
 
-function FoodRow({ food, isLast, mealFood, onPress }: FoodRowProps) {
+function FoodRow({
+  food,
+  isLast,
+  mealFood,
+  onDecreaseQuantity,
+  onIncreaseQuantity,
+  onPress,
+}: FoodRowProps) {
+  const quantity = normalizeQuantity(mealFood.quantity);
+  const totalAmount = mealFood.amount * quantity;
+  const totalNutrition = multiplyNutritionByQuantity(
+    mealFood.calculatedNutrition,
+    quantity,
+  );
   const missingPrimaryFields = primaryNutritionFields.filter(
     (field) => mealFood.calculatedNutrition[field] === null,
   );
+  const handleDecrease = (event: GestureResponderEvent) => {
+    event.stopPropagation();
+    onDecreaseQuantity();
+  };
+  const handleIncrease = (event: GestureResponderEvent) => {
+    event.stopPropagation();
+    onIncreaseQuantity();
+  };
 
   return (
     <Pressable
@@ -296,19 +766,41 @@ function FoodRow({ food, isLast, mealFood, onPress }: FoodRowProps) {
       <View style={styles.foodContent}>
         <View style={styles.foodHeader}>
           <Text style={styles.foodName}>{food?.name ?? '알 수 없는 음식'}</Text>
-          <Text style={styles.foodAmount}>
-            {mealFood.amount} {mealFood.amountUnit}
-          </Text>
+          <View style={styles.quantityControl}>
+            <Pressable
+              accessibilityLabel={`${food?.name ?? '음식'} 수량 감소`}
+              accessibilityRole="button"
+              onPress={handleDecrease}
+              style={({ pressed }) => [
+                styles.quantityButton,
+                pressed ? styles.quantityButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.quantityButtonText}>-</Text>
+            </Pressable>
+            <Text style={styles.quantityValue}>{quantity}</Text>
+            <Pressable
+              accessibilityLabel={`${food?.name ?? '음식'} 수량 증가`}
+              accessibilityRole="button"
+              onPress={handleIncrease}
+              style={({ pressed }) => [
+                styles.quantityButton,
+                pressed ? styles.quantityButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.quantityButtonText}>+</Text>
+            </Pressable>
+          </View>
         </View>
         <Text style={styles.foodMeta}>
-          {food?.category ?? '분류 없음'} · 기준 {food?.servingSize ?? '정보 없음'} {food?.servingUnit ?? ''}
+          {food?.category ?? '분류 없음'} · 기준 {food ? formatServingText(food) : '정보 없음'} · 총 {formatAmountLabel(totalAmount)} {mealFood.amountUnit}
         </Text>
 
         <View style={styles.foodNutritionLine}>
           {primaryNutritionFields.map((field) => (
             <Text key={field} style={styles.foodNutritionText}>
-              {nutritionLabels[field]} {formatNutritionNumber(field, mealFood.calculatedNutrition[field])}
-              {mealFood.calculatedNutrition[field] === null
+              {nutritionLabels[field]} {formatNutritionNumber(field, totalNutrition[field])}
+              {totalNutrition[field] === null
                 ? ''
                 : ` ${nutritionUnits[field]}`}
             </Text>
@@ -317,7 +809,7 @@ function FoodRow({ food, isLast, mealFood, onPress }: FoodRowProps) {
 
         {missingPrimaryFields.length > 0 ? (
           <Text style={styles.foodWarning}>
-            {missingPrimaryFields.map((field) => nutritionLabels[field]).join(', ')} 정보 없음
+            일부 영양정보 없음: {missingPrimaryFields.map((field) => nutritionLabels[field]).join(', ')}
           </Text>
         ) : null}
       </View>
@@ -462,6 +954,108 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  searchPanel: {
+    borderTopColor: '#e5ebe1',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 14,
+    paddingTop: 14,
+  },
+  searchHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  searchInputRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  searchInput: {
+    backgroundColor: '#fbfcfa',
+    borderColor: '#cfdac9',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#172016',
+    flex: 1,
+    fontSize: 15,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  searchMessageText: {
+    color: '#687265',
+    fontSize: 13,
+    marginTop: 12,
+  },
+  searchErrorText: {
+    color: '#9a2e00',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 12,
+  },
+  searchResultList: {
+    gap: 10,
+    marginTop: 12,
+  },
+  searchResultCard: {
+    backgroundColor: '#fbfcfa',
+    borderColor: '#e1e8dd',
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 12,
+  },
+  searchResultHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  searchResultTitleBlock: {
+    flex: 1,
+    gap: 4,
+  },
+  searchResultName: {
+    color: '#172016',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  searchResultMeta: {
+    color: '#687265',
+    fontSize: 12,
+  },
+  resultWarning: {
+    color: '#9a5b00',
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  searchNutritionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  searchNutritionItem: {
+    backgroundColor: '#f1f5ef',
+    borderRadius: 8,
+    minWidth: 92,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  searchNutritionLabel: {
+    color: '#687265',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  searchNutritionValue: {
+    color: '#263324',
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 3,
+  },
   mealStack: {
     gap: 14,
     marginTop: 16,
@@ -533,6 +1127,11 @@ const styles = StyleSheet.create({
   foodRowPressed: {
     opacity: 0.72,
   },
+  emptyMealText: {
+    color: '#687265',
+    fontSize: 13,
+    paddingTop: 12,
+  },
   checkbox: {
     alignItems: 'center',
     borderColor: '#8b9887',
@@ -569,11 +1168,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  foodAmount: {
-    color: '#40503d',
-    fontSize: 13,
-    fontWeight: '700',
-  },
   foodMeta: {
     color: '#687265',
     fontSize: 12,
@@ -592,6 +1186,103 @@ const styles = StyleSheet.create({
     color: '#9a5b00',
     fontSize: 12,
     fontWeight: '700',
+  },
+  searchCloseButton: {
+    alignItems: 'center',
+    backgroundColor: '#eef3ec',
+    borderColor: '#d7e1d2',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 34,
+    paddingHorizontal: 10,
+  },
+  searchCloseButtonPressed: {
+    opacity: 0.72,
+  },
+  searchCloseButtonText: {
+    color: '#536250',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  selectFoodButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    backgroundColor: '#2f7d32',
+    borderRadius: 8,
+    justifyContent: 'center',
+    marginTop: 12,
+    minHeight: 36,
+    minWidth: 62,
+    paddingHorizontal: 12,
+  },
+  selectFoodButtonPressed: {
+    opacity: 0.72,
+  },
+  selectFoodButtonDisabled: {
+    backgroundColor: '#d8ded5',
+  },
+  selectFoodButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  selectFoodButtonDisabledText: {
+    color: '#687265',
+  },
+  mealTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  openSearchButton: {
+    alignItems: 'center',
+    backgroundColor: '#2f7d32',
+    borderRadius: 8,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
+  },
+  openSearchButtonPressed: {
+    opacity: 0.72,
+  },
+  openSearchButtonText: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  quantityControl: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 0,
+    gap: 6,
+  },
+  quantityButton: {
+    alignItems: 'center',
+    backgroundColor: '#eef3ec',
+    borderColor: '#cbdcc4',
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
+  },
+  quantityButtonPressed: {
+    opacity: 0.72,
+  },
+  quantityButtonText: {
+    color: '#2f6d35',
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 20,
+  },
+  quantityValue: {
+    color: '#172016',
+    fontSize: 15,
+    fontWeight: '800',
+    minWidth: 18,
+    textAlign: 'center',
   },
   disclaimer: {
     color: '#687265',

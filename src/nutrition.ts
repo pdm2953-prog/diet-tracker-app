@@ -133,16 +133,35 @@ export function summarizeNutrition(
   return { total, missingFields };
 }
 
+export function multiplyNutritionByQuantity(
+  nutrition: Nutrition,
+  quantity: number,
+): Nutrition {
+  const normalizedQuantity = Number.isFinite(quantity) && quantity > 0
+    ? Math.floor(quantity)
+    : 1;
+  const multiplied = createEmptyNutrition();
+
+  for (const field of nutritionFields) {
+    const value = nutrition[field];
+    multiplied[field] = typeof value === 'number'
+      ? value * normalizedQuantity
+      : null;
+  }
+
+  return multiplied;
+}
+
 export function buildDailySummary(date: string, meals: Meal[]): DailySummary {
   const checkedMealFoods = meals.flatMap((meal) =>
     meal.foods.filter((mealFood) => mealFood.checked),
   );
   const plannedMealFoods = meals.flatMap((meal) => meal.foods);
-  const checkedNutritionItems = checkedMealFoods.map(
-    (mealFood) => mealFood.calculatedNutrition,
+  const checkedNutritionItems = checkedMealFoods.map((mealFood) =>
+    multiplyNutritionByQuantity(mealFood.calculatedNutrition, mealFood.quantity),
   );
-  const plannedNutritionItems = plannedMealFoods.map(
-    (mealFood) => mealFood.calculatedNutrition,
+  const plannedNutritionItems = plannedMealFoods.map((mealFood) =>
+    multiplyNutritionByQuantity(mealFood.calculatedNutrition, mealFood.quantity),
   );
   const checkedSummary = summarizeNutrition(checkedNutritionItems);
   const plannedSummary = summarizeNutrition(plannedNutritionItems);
@@ -161,11 +180,11 @@ export function buildDailySummary(date: string, meals: Meal[]): DailySummary {
 export function createMealSummary(meal: Meal): MealSummary {
   const checkedMealFoods = meal.foods.filter((mealFood) => mealFood.checked);
   const plannedMealFoods = meal.foods;
-  const checkedNutritionItems = checkedMealFoods.map(
-    (mealFood) => mealFood.calculatedNutrition,
+  const checkedNutritionItems = checkedMealFoods.map((mealFood) =>
+    multiplyNutritionByQuantity(mealFood.calculatedNutrition, mealFood.quantity),
   );
-  const plannedNutritionItems = plannedMealFoods.map(
-    (mealFood) => mealFood.calculatedNutrition,
+  const plannedNutritionItems = plannedMealFoods.map((mealFood) =>
+    multiplyNutritionByQuantity(mealFood.calculatedNutrition, mealFood.quantity),
   );
   const checkedSummary = summarizeNutrition(checkedNutritionItems);
   const plannedSummary = summarizeNutrition(plannedNutritionItems);
