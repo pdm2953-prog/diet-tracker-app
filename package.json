@@ -20,7 +20,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-web.ps1",
-    "web:metro": "expo start --web"
+    "web:metro": "expo start --web",
+    "test": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test.ps1"
   },
   "private": true
 }

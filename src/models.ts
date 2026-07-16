@@ -30,9 +30,7 @@ export type MealFood = {
   id: string;
   foodId: string;
   mealId: string;
-  quantity: number;
-  amount: number;
-  amountUnit: string;
+  consumedGrams: number;
   checked: boolean;
   calculatedNutrition: Nutrition;
   createdAt: string;

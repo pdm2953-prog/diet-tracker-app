@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import {
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -13,6 +14,11 @@ import {
 } from 'react-native';
 
 import { createMockTodayData } from './src/mockTodayData';
+import {
+  addFoodToMeals,
+  hasValidGramServing,
+  normalizeConsumedGrams,
+} from './src/meals';
 import {
   Food,
   Meal,
@@ -26,7 +32,7 @@ import {
   dailyTargets,
   formatNutritionNumber,
   formatNutritionValue,
-  multiplyNutritionByQuantity,
+  calculateNutritionForConsumedGrams,
   nutritionLabels,
   nutritionUnits,
   primaryNutritionFields,
@@ -43,9 +49,16 @@ const mealLabels: Record<MealType, string> = {
   dinner: '저녁',
 };
 
+const GRAM_ADJUST_STEP = 10;
+
 let mealFoodIdSequence = 0;
 
 type PrimaryNutritionField = (typeof primaryNutritionFields)[number];
+
+type PortionModalState = {
+  food: FoodSearchResult;
+  mealType: MealType;
+};
 
 function isPrimaryNutritionField(
   field: NutritionField,
@@ -64,18 +77,19 @@ function formatAmountLabel(amount: number): string {
 }
 
 function formatServingText(food: Food): string {
-  if (!hasValidServing(food)) {
+  if (!hasValidServingSize(food)) {
     return '제공량 정보 없음';
   }
 
   return `${formatAmountLabel(food.servingSize)} ${food.servingUnit}`;
 }
 
-function hasValidServing(
+function hasValidServingSize(
   food: Food,
 ): food is Food & { servingSize: number; servingUnit: string } {
   return food.servingSize !== null && Number.isFinite(food.servingSize) && food.servingSize > 0 && food.servingUnit !== null;
 }
+
 
 function getMissingPrimaryFields(
   nutrition: Food['nutritionPerServing'],
@@ -83,8 +97,15 @@ function getMissingPrimaryFields(
   return primaryNutritionFields.filter((field) => nutrition[field] === null);
 }
 
-function normalizeQuantity(quantity: number): number {
-  return Number.isFinite(quantity) && quantity > 0 ? Math.floor(quantity) : 1;
+
+function parseConsumedGramsInput(input: string): number {
+  const normalizedInput = input.trim().replace(',', '.');
+
+  if (normalizedInput.length === 0) {
+    return Number.NaN;
+  }
+
+  return Number(normalizedInput);
 }
 
 function getLocalDateString(): string {
@@ -113,6 +134,8 @@ export default function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [activeSearchMealType, setActiveSearchMealType] = useState<MealType | null>(null);
+  const [portionModal, setPortionModal] = useState<PortionModalState | null>(null);
+  const [portionGramsInput, setPortionGramsInput] = useState('');
   const foodsById = useMemo<Record<string, Food>>(
     () =>
       Object.fromEntries(
@@ -206,8 +229,14 @@ export default function App() {
     };
   }, [activeSearchMealType, searchQuery]);
 
-  const addFoodToMeal = (food: FoodSearchResult, mealType: MealType) => {
-    if (!hasValidServing(food)) {
+  const addFoodToMeal = (
+    food: FoodSearchResult,
+    mealType: MealType,
+    consumedGrams: number,
+  ) => {
+    const normalizedConsumedGrams = normalizeConsumedGrams(consumedGrams);
+
+    if (!hasValidGramServing(food) || normalizedConsumedGrams <= 0) {
       return;
     }
 
@@ -220,98 +249,47 @@ export default function App() {
     );
 
     setMeals((currentMeals) =>
-      currentMeals.map((meal) => {
-        if (meal.type !== mealType) {
-          return meal;
-        }
-
-        const matchingMealFoods = meal.foods.filter(
-          (mealFood) => mealFood.foodId === food.id,
-        );
-
-        if (matchingMealFoods.length > 0) {
-          const [firstMatchingMealFood] = matchingMealFoods;
-          const mergedQuantity = matchingMealFoods.reduce(
-            (totalQuantity, mealFood) =>
-              totalQuantity + normalizeQuantity(mealFood.quantity),
-            1,
-          );
-          const mergedChecked = matchingMealFoods.some((mealFood) => mealFood.checked);
-
-          return {
-            ...meal,
-            updatedAt,
-            foods: meal.foods.reduce<MealFood[]>((updatedFoods, mealFood) => {
-              if (mealFood.foodId !== food.id) {
-                return [...updatedFoods, mealFood];
-              }
-
-              if (mealFood.id !== firstMatchingMealFood.id) {
-                return updatedFoods;
-              }
-
-              return [
-                ...updatedFoods,
-                {
-                  ...mealFood,
-                  quantity: mergedQuantity,
-                  checked: mergedChecked,
-                  updatedAt,
-                },
-              ];
-            }, []),
-          };
-        }
-
-        const mealFood: MealFood = {
-          id: createMealFoodId(food.id),
-          foodId: food.id,
-          mealId: meal.id,
-          quantity: 1,
-          amount: food.servingSize,
-          amountUnit: food.servingUnit,
-          checked: true,
-          calculatedNutrition: { ...food.nutritionPerServing },
-          createdAt: updatedAt,
-          updatedAt,
-        };
-
-        return {
-          ...meal,
-          updatedAt,
-          foods: [...meal.foods, mealFood],
-        };
+      addFoodToMeals(currentMeals, food, mealType, normalizedConsumedGrams, {
+        createMealFoodId,
+        updatedAt,
       }),
     );
   };
 
-  const increaseMealFoodQuantity = (mealId: string, mealFoodId: string) => {
-    const updatedAt = new Date().toISOString();
-
-    setMeals((currentMeals) =>
-      currentMeals.map((meal) => {
-        if (meal.id !== mealId) {
-          return meal;
-        }
-
-        return {
-          ...meal,
-          updatedAt,
-          foods: meal.foods.map((mealFood) =>
-            mealFood.id === mealFoodId
-              ? {
-                  ...mealFood,
-                  quantity: normalizeQuantity(mealFood.quantity) + 1,
-                  updatedAt,
-                }
-              : mealFood,
-          ),
-        };
-      }),
-    );
+  const closePortionModal = () => {
+    setPortionModal(null);
+    setPortionGramsInput('');
   };
 
-  const decreaseMealFoodQuantity = (mealId: string, mealFoodId: string) => {
+  const openPortionModal = (food: FoodSearchResult, mealType: MealType) => {
+    if (!hasValidGramServing(food)) {
+      return;
+    }
+
+    setPortionModal({ food, mealType });
+    setPortionGramsInput(formatAmountLabel(food.servingSize));
+  };
+
+  const confirmPortionModal = () => {
+    if (portionModal === null) {
+      return;
+    }
+
+    const consumedGrams = parseConsumedGramsInput(portionGramsInput);
+
+    if (!Number.isFinite(consumedGrams) || consumedGrams <= 0) {
+      return;
+    }
+
+    addFoodToMeal(portionModal.food, portionModal.mealType, consumedGrams);
+    closePortionModal();
+  };
+
+  const updateMealFoodConsumedGrams = (
+    mealId: string,
+    mealFoodId: string,
+    deltaGrams: number,
+  ) => {
     const updatedAt = new Date().toISOString();
 
     setMeals((currentMeals) =>
@@ -328,20 +306,56 @@ export default function App() {
               return [mealFood];
             }
 
-            const quantity = normalizeQuantity(mealFood.quantity);
+            const nextConsumedGrams = normalizeConsumedGrams(mealFood.consumedGrams) + deltaGrams;
 
-            if (quantity <= 1) {
+            if (nextConsumedGrams <= 0) {
               return [];
             }
+
+            const food = foodsById[mealFood.foodId];
+            const calculatedNutrition = food && hasValidGramServing(food)
+              ? calculateNutritionForConsumedGrams(
+                  food.nutritionPerServing,
+                  nextConsumedGrams,
+                  food.servingSize,
+                )
+              : mealFood.calculatedNutrition;
 
             return [
               {
                 ...mealFood,
-                quantity: quantity - 1,
+                consumedGrams: nextConsumedGrams,
+                calculatedNutrition,
                 updatedAt,
               },
             ];
           }),
+        };
+      }),
+    );
+  };
+
+  const decreaseMealFoodGrams = (mealId: string, mealFoodId: string) => {
+    updateMealFoodConsumedGrams(mealId, mealFoodId, -GRAM_ADJUST_STEP);
+  };
+
+  const increaseMealFoodGrams = (mealId: string, mealFoodId: string) => {
+    updateMealFoodConsumedGrams(mealId, mealFoodId, GRAM_ADJUST_STEP);
+  };
+
+  const removeMealFood = (mealId: string, mealFoodId: string) => {
+    const updatedAt = new Date().toISOString();
+
+    setMeals((currentMeals) =>
+      currentMeals.map((meal) => {
+        if (meal.id !== mealId) {
+          return meal;
+        }
+
+        return {
+          ...meal,
+          updatedAt,
+          foods: meal.foods.filter((mealFood) => mealFood.id !== mealFoodId),
         };
       }),
     );
@@ -392,8 +406,9 @@ export default function App() {
               key={meal.id}
               foodsById={foodsById}
               meal={meal}
-              onDecreaseQuantity={decreaseMealFoodQuantity}
-              onIncreaseQuantity={increaseMealFoodQuantity}
+              onDecreaseGrams={decreaseMealFoodGrams}
+              onIncreaseGrams={increaseMealFoodGrams}
+              onRemoveFood={removeMealFood}
               onOpenSearch={openFoodSearch}
               onToggle={toggleMealFood}
               searchPanel={
@@ -404,7 +419,7 @@ export default function App() {
                     mealType={meal.type}
                     onClose={closeFoodSearch}
                     onQueryChange={setSearchQuery}
-                    onSelectFood={(food) => addFoodToMeal(food, meal.type)}
+                    onSelectFood={(food) => openPortionModal(food, meal.type)}
                     query={searchQuery}
                     results={searchResults}
                     searchError={searchError}
@@ -422,7 +437,144 @@ export default function App() {
           영양정보는 참고용입니다. 섭취량 계산은 입력값과 데이터 출처에 따라 달라질 수 있습니다.
         </Text>
       </ScrollView>
+
+      <FoodPortionModal
+        gramsInput={portionGramsInput}
+        onChangeGramsInput={setPortionGramsInput}
+        onClose={closePortionModal}
+        onConfirm={confirmPortionModal}
+        state={portionModal}
+      />
     </SafeAreaView>
+  );
+}
+
+type FoodPortionModalProps = {
+  gramsInput: string;
+  onChangeGramsInput: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+  state: PortionModalState | null;
+};
+
+function FoodPortionModal({
+  gramsInput,
+  onChangeGramsInput,
+  onClose,
+  onConfirm,
+  state,
+}: FoodPortionModalProps) {
+  if (state === null) {
+    return null;
+  }
+
+  const consumedGrams = parseConsumedGramsInput(gramsInput);
+  const servingSize = hasValidGramServing(state.food)
+    ? state.food.servingSize
+    : null;
+  const hasValidServing = servingSize !== null;
+  const hasValidInput = Number.isFinite(consumedGrams) && consumedGrams > 0;
+  const canConfirm = hasValidServing && hasValidInput;
+  const portionErrorMessage = hasValidServing
+    ? '0보다 큰 숫자를 입력해주세요.'
+    : '기준 g 제공량이 없어 추가할 수 없습니다.';
+  const previewNutrition = servingSize !== null && hasValidInput
+    ? calculateNutritionForConsumedGrams(
+        state.food.nutritionPerServing,
+        consumedGrams,
+        servingSize,
+      )
+    : null;
+
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={onClose}
+      transparent
+      visible
+    >
+      <View style={styles.modalOverlay}>
+        <Pressable
+          accessibilityLabel="섭취량 입력 닫기"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.modalScrim}
+        />
+        <View style={styles.portionModal}>
+          <Text style={styles.portionModalTitle}>얼마나 드셨나요?</Text>
+          <Text style={styles.portionFoodName}>{state.food.name}</Text>
+          <Text style={styles.portionServingText}>
+            기준 {formatServingText(state.food)}
+          </Text>
+
+          <View style={styles.portionInputRow}>
+            <TextInput
+              accessibilityLabel={`${state.food.name} 섭취 g 수 입력`}
+              autoFocus
+              keyboardType="decimal-pad"
+              onChangeText={onChangeGramsInput}
+              placeholder="50"
+              placeholderTextColor="#8b9588"
+              selectTextOnFocus
+              style={styles.portionInput}
+              value={gramsInput}
+            />
+            <Text style={styles.portionUnitText}>g</Text>
+          </View>
+
+          {previewNutrition !== null ? (
+            <View style={styles.portionPreview}>
+              <Text style={styles.portionPreviewTitle}>예상 영양성분</Text>
+              <View style={styles.portionPreviewGrid}>
+                {primaryNutritionFields.map((field) => (
+                  <View key={field} style={styles.portionPreviewItem}>
+                    <Text style={styles.portionPreviewLabel}>{nutritionLabels[field]}</Text>
+                    <Text style={styles.portionPreviewValue}>
+                      {formatNutritionValue(field, previewNutrition[field])}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.portionErrorText}>{portionErrorMessage}</Text>
+          )}
+
+          <View style={styles.portionButtonRow}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onClose}
+              style={({ pressed }) => [
+                styles.portionCancelButton,
+                pressed ? styles.portionButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.portionCancelButtonText}>취소</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canConfirm }}
+              disabled={!canConfirm}
+              onPress={onConfirm}
+              style={({ pressed }) => [
+                styles.portionConfirmButton,
+                !canConfirm ? styles.portionConfirmButtonDisabled : null,
+                pressed && canConfirm ? styles.portionButtonPressed : null,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.portionConfirmButtonText,
+                  !canConfirm ? styles.portionConfirmButtonDisabledText : null,
+                ]}
+              >
+                확인
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -570,7 +722,7 @@ type FoodSearchResultCardProps = {
 
 function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps) {
   const missingPrimaryFields = getMissingPrimaryFields(food.nutritionPerServing);
-  const canAddFood = hasValidServing(food);
+  const canAddFood = hasValidGramServing(food);
 
   return (
     <View style={styles.searchResultCard}>
@@ -631,9 +783,10 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
 type MealSectionProps = {
   foodsById: Record<string, Food>;
   meal: Meal;
-  onDecreaseQuantity: (mealId: string, mealFoodId: string) => void;
-  onIncreaseQuantity: (mealId: string, mealFoodId: string) => void;
+  onDecreaseGrams: (mealId: string, mealFoodId: string) => void;
+  onIncreaseGrams: (mealId: string, mealFoodId: string) => void;
   onOpenSearch: (mealType: MealType) => void;
+  onRemoveFood: (mealId: string, mealFoodId: string) => void;
   onToggle: (mealId: string, mealFoodId: string) => void;
   searchPanel: ReactNode;
   summary: MealSummary | null | undefined;
@@ -642,9 +795,10 @@ type MealSectionProps = {
 function MealSection({
   foodsById,
   meal,
-  onDecreaseQuantity,
-  onIncreaseQuantity,
+  onDecreaseGrams,
+  onIncreaseGrams,
   onOpenSearch,
+  onRemoveFood,
   onToggle,
   searchPanel,
   summary,
@@ -700,9 +854,10 @@ function MealSection({
               food={foodsById[mealFood.foodId]}
               isLast={index === meal.foods.length - 1}
               mealFood={mealFood}
-              onDecreaseQuantity={() => onDecreaseQuantity(meal.id, mealFood.id)}
-              onIncreaseQuantity={() => onIncreaseQuantity(meal.id, mealFood.id)}
+              onDecreaseGrams={() => onDecreaseGrams(meal.id, mealFood.id)}
+              onIncreaseGrams={() => onIncreaseGrams(meal.id, mealFood.id)}
               onPress={() => onToggle(meal.id, mealFood.id)}
+              onRemove={() => onRemoveFood(meal.id, mealFood.id)}
             />
           ))
         ) : (
@@ -717,35 +872,38 @@ type FoodRowProps = {
   food: Food | undefined;
   isLast: boolean;
   mealFood: MealFood;
-  onDecreaseQuantity: () => void;
-  onIncreaseQuantity: () => void;
+  onDecreaseGrams: () => void;
+  onIncreaseGrams: () => void;
   onPress: () => void;
+  onRemove: () => void;
 };
 
 function FoodRow({
   food,
   isLast,
   mealFood,
-  onDecreaseQuantity,
-  onIncreaseQuantity,
+  onDecreaseGrams,
+  onIncreaseGrams,
   onPress,
+  onRemove,
 }: FoodRowProps) {
-  const quantity = normalizeQuantity(mealFood.quantity);
-  const totalAmount = mealFood.amount * quantity;
-  const totalNutrition = multiplyNutritionByQuantity(
-    mealFood.calculatedNutrition,
-    quantity,
-  );
+  const consumedGrams = normalizeConsumedGrams(mealFood.consumedGrams);
+  const totalNutrition = mealFood.calculatedNutrition;
   const missingPrimaryFields = primaryNutritionFields.filter(
     (field) => mealFood.calculatedNutrition[field] === null,
   );
+  const foodName = food?.name ?? '알 수 없는 음식';
   const handleDecrease = (event: GestureResponderEvent) => {
     event.stopPropagation();
-    onDecreaseQuantity();
+    onDecreaseGrams();
   };
   const handleIncrease = (event: GestureResponderEvent) => {
     event.stopPropagation();
-    onIncreaseQuantity();
+    onIncreaseGrams();
+  };
+  const handleRemove = (event: GestureResponderEvent) => {
+    event.stopPropagation();
+    onRemove();
   };
 
   return (
@@ -765,35 +923,47 @@ function FoodRow({
 
       <View style={styles.foodContent}>
         <View style={styles.foodHeader}>
-          <Text style={styles.foodName}>{food?.name ?? '알 수 없는 음식'}</Text>
-          <View style={styles.quantityControl}>
+          <Text style={styles.foodName}>
+            {foodName} {formatAmountLabel(consumedGrams)}g
+          </Text>
+          <View style={styles.gramsControl}>
             <Pressable
-              accessibilityLabel={`${food?.name ?? '음식'} 수량 감소`}
+              accessibilityLabel={`${foodName} 섭취량 10g 감소`}
               accessibilityRole="button"
               onPress={handleDecrease}
               style={({ pressed }) => [
-                styles.quantityButton,
-                pressed ? styles.quantityButtonPressed : null,
+                styles.gramsButton,
+                pressed ? styles.gramsButtonPressed : null,
               ]}
             >
-              <Text style={styles.quantityButtonText}>-</Text>
+              <Text style={styles.gramsButtonText}>-10g</Text>
             </Pressable>
-            <Text style={styles.quantityValue}>{quantity}</Text>
             <Pressable
-              accessibilityLabel={`${food?.name ?? '음식'} 수량 증가`}
+              accessibilityLabel={`${foodName} 섭취량 10g 증가`}
               accessibilityRole="button"
               onPress={handleIncrease}
               style={({ pressed }) => [
-                styles.quantityButton,
-                pressed ? styles.quantityButtonPressed : null,
+                styles.gramsButton,
+                pressed ? styles.gramsButtonPressed : null,
               ]}
             >
-              <Text style={styles.quantityButtonText}>+</Text>
+              <Text style={styles.gramsButtonText}>+10g</Text>
+            </Pressable>
+            <Pressable
+              accessibilityLabel={`${foodName} 제거`}
+              accessibilityRole="button"
+              onPress={handleRemove}
+              style={({ pressed }) => [
+                styles.removeFoodButton,
+                pressed ? styles.gramsButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.removeFoodButtonText}>삭제</Text>
             </Pressable>
           </View>
         </View>
         <Text style={styles.foodMeta}>
-          {food?.category ?? '분류 없음'} · 기준 {food ? formatServingText(food) : '정보 없음'} · 총 {formatAmountLabel(totalAmount)} {mealFood.amountUnit}
+          {food?.category ?? '분류 없음'} · 기준 {food ? formatServingText(food) : '정보 없음'}
         </Text>
 
         <View style={styles.foodNutritionLine}>
@@ -1252,37 +1422,195 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 22,
   },
-  quantityControl: {
+  gramsControl: {
     alignItems: 'center',
     flexDirection: 'row',
     flexShrink: 0,
+    flexWrap: 'wrap',
     gap: 6,
+    justifyContent: 'flex-end',
   },
-  quantityButton: {
+  gramsButton: {
     alignItems: 'center',
     backgroundColor: '#eef3ec',
     borderColor: '#cbdcc4',
     borderRadius: 8,
     borderWidth: 1,
-    height: 30,
     justifyContent: 'center',
-    width: 30,
+    minHeight: 30,
+    minWidth: 48,
+    paddingHorizontal: 8,
   },
-  quantityButtonPressed: {
+  gramsButtonPressed: {
     opacity: 0.72,
   },
-  quantityButtonText: {
+  gramsButtonText: {
     color: '#2f6d35',
-    fontSize: 18,
+    fontSize: 12,
     fontWeight: '900',
-    lineHeight: 20,
   },
-  quantityValue: {
+  removeFoodButton: {
+    alignItems: 'center',
+    backgroundColor: '#fff2ed',
+    borderColor: '#f2c2b4',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 30,
+    minWidth: 42,
+    paddingHorizontal: 8,
+  },
+  removeFoodButtonText: {
+    color: '#9a2e00',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(23, 32, 22, 0.34)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalScrim: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  portionModal: {
+    backgroundColor: '#ffffff',
+    borderColor: '#dde6d8',
+    borderRadius: 8,
+    borderWidth: 1,
+    maxWidth: 360,
+    padding: 18,
+    width: '100%',
+  },
+  portionModalTitle: {
     color: '#172016',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 0,
+  },
+  portionFoodName: {
+    color: '#263324',
     fontSize: 15,
     fontWeight: '800',
-    minWidth: 18,
-    textAlign: 'center',
+    marginTop: 8,
+  },
+  portionServingText: {
+    color: '#687265',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  portionInputRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  portionInput: {
+    backgroundColor: '#fbfcfa',
+    borderColor: '#cfdac9',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#172016',
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '800',
+    minHeight: 46,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  portionUnitText: {
+    color: '#40503d',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  portionErrorText: {
+    color: '#9a2e00',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 12,
+  },
+  portionPreview: {
+    borderTopColor: '#e5ebe1',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+    marginTop: 14,
+    paddingTop: 12,
+  },
+  portionPreviewTitle: {
+    color: '#263324',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  portionPreviewGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  portionPreviewItem: {
+    flexGrow: 1,
+    minWidth: 120,
+  },
+  portionPreviewLabel: {
+    color: '#687265',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  portionPreviewValue: {
+    color: '#172016',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  portionButtonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'flex-end',
+    marginTop: 18,
+  },
+  portionCancelButton: {
+    alignItems: 'center',
+    backgroundColor: '#eef3ec',
+    borderColor: '#d7e1d2',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 38,
+    minWidth: 66,
+    paddingHorizontal: 12,
+  },
+  portionCancelButtonText: {
+    color: '#536250',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  portionConfirmButton: {
+    alignItems: 'center',
+    backgroundColor: '#2f7d32',
+    borderRadius: 8,
+    justifyContent: 'center',
+    minHeight: 38,
+    minWidth: 66,
+    paddingHorizontal: 12,
+  },
+  portionConfirmButtonDisabled: {
+    backgroundColor: '#d8ded5',
+  },
+  portionConfirmButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  portionConfirmButtonDisabledText: {
+    color: '#687265',
+  },
+  portionButtonPressed: {
+    opacity: 0.72,
   },
   disclaimer: {
     color: '#687265',

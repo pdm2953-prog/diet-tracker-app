@@ -56,8 +56,8 @@ export const mockFoodSearchFoods: Food[] = [
     name: '삶은 달걀',
     brandName: null,
     category: '난류',
-    servingSize: 1,
-    servingUnit: '개',
+    servingSize: 50,
+    servingUnit: 'g',
     nutritionPerServing: {
       caloriesKcal: 78,
       carbohydrateG: 0.6,
