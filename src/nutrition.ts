@@ -26,6 +26,10 @@ export const primaryNutritionFields = [
   'fatG',
 ] as const satisfies readonly NutritionField[];
 
+export type PrimaryNutritionField = (typeof primaryNutritionFields)[number];
+
+export type DailyNutritionTargets = Record<PrimaryNutritionField, number>;
+
 export const nutritionLabels: Record<NutritionField, string> = {
   caloriesKcal: '칼로리',
   carbohydrateG: '탄수화물',
@@ -52,7 +56,7 @@ export const nutritionUnits: Record<NutritionField, string> = {
   cholesterolMg: 'mg',
 };
 
-export const dailyTargets: Pick<Nutrition, (typeof primaryNutritionFields)[number]> = {
+export const dailyTargets: DailyNutritionTargets = {
   caloriesKcal: 2000,
   proteinG: 70,
   carbohydrateG: 300,

@@ -37,6 +37,23 @@ import {
   nutritionUnits,
   primaryNutritionFields,
 } from './src/nutrition';
+import type { DailyNutritionTargets } from './src/nutrition';
+import {
+  activityLevelDescriptions,
+  activityLevelLabels,
+  applyNutritionGoalRecommendationTargets,
+  bmiCategoryLabels,
+  calculateNutritionGoalRecommendation,
+  nutritionGoalLabels,
+  sexLabels,
+} from './src/nutritionGoals';
+import type {
+  ActivityLevel,
+  GoalCalculationMode,
+  NutritionGoalRecommendation,
+  NutritionGoalType,
+  Sex,
+} from './src/nutritionGoals';
 import {
   FOOD_SEARCH_RESULT_LIMIT,
   mockFoodSearchProvider,
@@ -51,6 +68,25 @@ const mealLabels: Record<MealType, string> = {
 
 const GRAM_ADJUST_STEP = 10;
 
+const inBodyReportOptions: Array<{ label: string; value: boolean }> = [
+  { label: '있음', value: true },
+  { label: '없음', value: false },
+];
+
+const sexOptions: Sex[] = ['male', 'female'];
+const nutritionGoalOptions: NutritionGoalType[] = ['diet', 'maintain', 'bulk'];
+const activityLevelOptions: ActivityLevel[] = [
+  'sedentary',
+  'light',
+  'moderate',
+  'veryActive',
+];
+
+const goalCalculationModeLabels: Record<GoalCalculationMode, string> = {
+  standard: '일반',
+  inbody: '인바디',
+};
+
 let mealFoodIdSequence = 0;
 
 type PrimaryNutritionField = (typeof primaryNutritionFields)[number];
@@ -58,6 +94,43 @@ type PrimaryNutritionField = (typeof primaryNutritionFields)[number];
 type PortionModalState = {
   food: FoodSearchResult;
   mealType: MealType;
+};
+
+type GoalFormState = {
+  hasInBodyReport: boolean;
+  ageYears: string;
+  sex: Sex;
+  heightCm: string;
+  weightKg: string;
+  goal: NutritionGoalType;
+  activityLevel: ActivityLevel;
+  inBodyMeasuredAt: string;
+  inBodyBmrKcal: string;
+  skeletalMuscleMassKg: string;
+  bodyFatMassKg: string;
+  bodyFatPercentage: string;
+  visceralFatLevel: string;
+};
+
+type GoalFormChangeHandler = <Field extends keyof GoalFormState>(
+  field: Field,
+  value: GoalFormState[Field],
+) => void;
+
+const DEFAULT_GOAL_FORM: GoalFormState = {
+  hasInBodyReport: false,
+  ageYears: '30',
+  sex: 'male',
+  heightCm: '175',
+  weightKg: '70',
+  goal: 'maintain',
+  activityLevel: 'light',
+  inBodyMeasuredAt: '',
+  inBodyBmrKcal: '',
+  skeletalMuscleMassKg: '',
+  bodyFatMassKg: '',
+  bodyFatPercentage: '',
+  visceralFatLevel: '',
 };
 
 function isPrimaryNutritionField(
@@ -108,6 +181,38 @@ function parseConsumedGramsInput(input: string): number {
   return Number(normalizedInput);
 }
 
+function parseGoalNumberInput(input: string): number {
+  const normalizedInput = input.trim().replace(',', '.');
+
+  if (normalizedInput.length === 0) {
+    return Number.NaN;
+  }
+
+  return Number(normalizedInput);
+}
+
+function parseOptionalGoalNumberInput(input: string): number | null {
+  const normalizedInput = input.trim().replace(',', '.');
+
+  if (normalizedInput.length === 0) {
+    return null;
+  }
+
+  return Number(normalizedInput);
+}
+
+function formatKcalValue(value: number): string {
+  return `${Math.round(value)} kcal`;
+}
+
+function formatGramValue(value: number): string {
+  return `${value.toFixed(1)} g`;
+}
+
+function formatBmiValue(value: number): string {
+  return value.toFixed(1);
+}
+
 function getLocalDateString(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -136,6 +241,8 @@ export default function App() {
   const [activeSearchMealType, setActiveSearchMealType] = useState<MealType | null>(null);
   const [portionModal, setPortionModal] = useState<PortionModalState | null>(null);
   const [portionGramsInput, setPortionGramsInput] = useState('');
+  const [todayTargets, setTodayTargets] = useState<DailyNutritionTargets>(dailyTargets);
+  const [goalForm, setGoalForm] = useState<GoalFormState>(DEFAULT_GOAL_FORM);
   const foodsById = useMemo<Record<string, Food>>(
     () =>
       Object.fromEntries(
@@ -147,6 +254,42 @@ export default function App() {
     () => buildDailySummary(today, meals),
     [meals, today],
   );
+  const goalRecommendation = useMemo(
+    () => calculateNutritionGoalRecommendation({
+      ageYears: parseGoalNumberInput(goalForm.ageYears),
+      sex: goalForm.sex,
+      heightCm: parseGoalNumberInput(goalForm.heightCm),
+      weightKg: parseGoalNumberInput(goalForm.weightKg),
+      goal: goalForm.goal,
+      activityLevel: goalForm.activityLevel,
+      hasInBodyReport: goalForm.hasInBodyReport,
+      inBody: {
+        measuredAt: goalForm.inBodyMeasuredAt.trim(),
+        bmrKcal: parseOptionalGoalNumberInput(goalForm.inBodyBmrKcal),
+        skeletalMuscleMassKg: parseOptionalGoalNumberInput(goalForm.skeletalMuscleMassKg),
+        bodyFatMassKg: parseOptionalGoalNumberInput(goalForm.bodyFatMassKg),
+        bodyFatPercentage: parseOptionalGoalNumberInput(goalForm.bodyFatPercentage),
+        visceralFatLevel: parseOptionalGoalNumberInput(goalForm.visceralFatLevel),
+      },
+    }),
+    [goalForm],
+  );
+
+  function updateGoalFormField<Field extends keyof GoalFormState>(
+    field: Field,
+    value: GoalFormState[Field],
+  ) {
+    setGoalForm((currentGoalForm) => ({
+      ...currentGoalForm,
+      [field]: value,
+    }));
+  }
+
+  const applyRecommendedTargets = () => {
+    setTodayTargets((currentTargets) =>
+      applyNutritionGoalRecommendationTargets(currentTargets, goalRecommendation),
+    );
+  };
 
   const toggleMealFood = (mealId: string, mealFoodId: string) => {
     const updatedAt = new Date().toISOString();
@@ -394,12 +537,19 @@ export default function App() {
                 key={field}
                 field={field}
                 isMissing={dailySummary.missingNutritionFields.includes(field)}
+                target={todayTargets[field]}
                 value={dailySummary.checkedNutritionTotal[field]}
               />
             ))}
           </View>
         </View>
 
+        <GoalRecommendationPanel
+          form={goalForm}
+          onApplyTargets={applyRecommendedTargets}
+          onChangeField={updateGoalFormField}
+          recommendation={goalRecommendation}
+        />
         <View style={styles.mealStack}>
           {meals.map((meal) => (
             <MealSection
@@ -446,6 +596,366 @@ export default function App() {
         state={portionModal}
       />
     </SafeAreaView>
+  );
+}
+
+type GoalRecommendationPanelProps = {
+  form: GoalFormState;
+  onApplyTargets: () => void;
+  onChangeField: GoalFormChangeHandler;
+  recommendation: NutritionGoalRecommendation;
+};
+
+function GoalRecommendationPanel({
+  form,
+  onApplyTargets,
+  onChangeField,
+  recommendation,
+}: GoalRecommendationPanelProps) {
+  return (
+    <View style={styles.goalPanel}>
+      <View style={styles.summaryHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>목표 추천</Text>
+          <Text style={styles.sectionSubtitle}>칼로리와 3대 영양성분 목표 설정</Text>
+        </View>
+      </View>
+
+      <View style={styles.goalQuestionBlock}>
+        <Text style={styles.goalQuestionText}>인바디 검사지가 있나요?</Text>
+        <View style={styles.segmentedControl}>
+          {inBodyReportOptions.map((option) => {
+            const selected = form.hasInBodyReport === option.value;
+
+            return (
+              <Pressable
+                accessibilityRole="button"
+                key={option.label}
+                onPress={() => onChangeField('hasInBodyReport', option.value)}
+                style={({ pressed }) => [
+                  styles.segmentButton,
+                  selected ? styles.segmentButtonActive : null,
+                  pressed ? styles.segmentButtonPressed : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.segmentButtonText,
+                    selected ? styles.segmentButtonTextActive : null,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.goalFormGrid}>
+        <GoalTextInput
+          keyboardType="number-pad"
+          label="나이"
+          onChangeText={(value) => onChangeField('ageYears', value)}
+          unit="세"
+          value={form.ageYears}
+        />
+        <GoalTextInput
+          keyboardType="decimal-pad"
+          label="신장"
+          onChangeText={(value) => onChangeField('heightCm', value)}
+          unit="cm"
+          value={form.heightCm}
+        />
+        <GoalTextInput
+          keyboardType="decimal-pad"
+          label="체중"
+          onChangeText={(value) => onChangeField('weightKg', value)}
+          unit="kg"
+          value={form.weightKg}
+        />
+      </View>
+
+      <View style={styles.goalChoiceSection}>
+        <Text style={styles.goalFieldLabel}>성별</Text>
+        <View style={styles.segmentedControl}>
+          {sexOptions.map((sex) => {
+            const selected = form.sex === sex;
+
+            return (
+              <Pressable
+                accessibilityRole="button"
+                key={sex}
+                onPress={() => onChangeField('sex', sex)}
+                style={({ pressed }) => [
+                  styles.segmentButton,
+                  selected ? styles.segmentButtonActive : null,
+                  pressed ? styles.segmentButtonPressed : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.segmentButtonText,
+                    selected ? styles.segmentButtonTextActive : null,
+                  ]}
+                >
+                  {sexLabels[sex]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.goalChoiceSection}>
+        <Text style={styles.goalFieldLabel}>목표</Text>
+        <View style={styles.segmentedControl}>
+          {nutritionGoalOptions.map((goal) => {
+            const selected = form.goal === goal;
+
+            return (
+              <Pressable
+                accessibilityRole="button"
+                key={goal}
+                onPress={() => onChangeField('goal', goal)}
+                style={({ pressed }) => [
+                  styles.segmentButton,
+                  selected ? styles.segmentButtonActive : null,
+                  pressed ? styles.segmentButtonPressed : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.segmentButtonText,
+                    selected ? styles.segmentButtonTextActive : null,
+                  ]}
+                >
+                  {nutritionGoalLabels[goal]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.goalChoiceSection}>
+        <Text style={styles.goalFieldLabel}>평상시 활동량</Text>
+        <Text style={styles.goalHelpText}>
+          활동량은 운동 시간이 아니라 평상시 운동 외 직업/생활 활동량 기준입니다.
+        </Text>
+        <View style={styles.activityList}>
+          {activityLevelOptions.map((activityLevel) => {
+            const selected = form.activityLevel === activityLevel;
+
+            return (
+              <Pressable
+                accessibilityRole="button"
+                key={activityLevel}
+                onPress={() => onChangeField('activityLevel', activityLevel)}
+                style={({ pressed }) => [
+                  styles.activityOption,
+                  selected ? styles.activityOptionActive : null,
+                  pressed ? styles.segmentButtonPressed : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.activityLabel,
+                    selected ? styles.activityLabelActive : null,
+                  ]}
+                >
+                  {activityLevelLabels[activityLevel]}
+                </Text>
+                <Text
+                  style={[
+                    styles.activityDescription,
+                    selected ? styles.activityDescriptionActive : null,
+                  ]}
+                >
+                  {activityLevelDescriptions[activityLevel]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {form.hasInBodyReport ? (
+        <View style={styles.inBodySection}>
+          <Text style={styles.goalSubsectionTitle}>인바디 직접 입력</Text>
+          <View style={styles.goalFormGrid}>
+            <GoalTextInput
+              label="측정일"
+              onChangeText={(value) => onChangeField('inBodyMeasuredAt', value)}
+              placeholder="YYYY-MM-DD"
+              value={form.inBodyMeasuredAt}
+            />
+            <GoalTextInput
+              keyboardType="decimal-pad"
+              label="기초대사량"
+              onChangeText={(value) => onChangeField('inBodyBmrKcal', value)}
+              unit="kcal"
+              value={form.inBodyBmrKcal}
+            />
+            <GoalTextInput
+              keyboardType="decimal-pad"
+              label="골격근량"
+              onChangeText={(value) => onChangeField('skeletalMuscleMassKg', value)}
+              unit="kg"
+              value={form.skeletalMuscleMassKg}
+            />
+            <GoalTextInput
+              keyboardType="decimal-pad"
+              label="체지방량"
+              onChangeText={(value) => onChangeField('bodyFatMassKg', value)}
+              unit="kg"
+              value={form.bodyFatMassKg}
+            />
+            <GoalTextInput
+              keyboardType="decimal-pad"
+              label="체지방률"
+              onChangeText={(value) => onChangeField('bodyFatPercentage', value)}
+              unit="%"
+              value={form.bodyFatPercentage}
+            />
+            <GoalTextInput
+              keyboardType="decimal-pad"
+              label="내장지방 레벨"
+              onChangeText={(value) => onChangeField('visceralFatLevel', value)}
+              value={form.visceralFatLevel}
+            />
+          </View>
+        </View>
+      ) : null}
+
+      <GoalRecommendationResult
+        onApplyTargets={onApplyTargets}
+        recommendation={recommendation}
+      />
+    </View>
+  );
+}
+
+type GoalTextInputProps = {
+  keyboardType?: 'default' | 'decimal-pad' | 'number-pad';
+  label: string;
+  onChangeText: (value: string) => void;
+  placeholder?: string;
+  unit?: string;
+  value: string;
+};
+
+function GoalTextInput({
+  keyboardType = 'default',
+  label,
+  onChangeText,
+  placeholder,
+  unit,
+  value,
+}: GoalTextInputProps) {
+  return (
+    <View style={styles.goalInputGroup}>
+      <Text style={styles.goalFieldLabel}>{label}</Text>
+      <View style={styles.goalInputRow}>
+        <TextInput
+          keyboardType={keyboardType}
+          onChangeText={onChangeText}
+          placeholder={placeholder ?? label}
+          placeholderTextColor="#8b9588"
+          style={styles.goalTextInput}
+          value={value}
+        />
+        {unit ? <Text style={styles.goalUnitText}>{unit}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+type GoalRecommendationResultProps = {
+  onApplyTargets: () => void;
+  recommendation: NutritionGoalRecommendation;
+};
+
+function GoalRecommendationResult({
+  onApplyTargets,
+  recommendation,
+}: GoalRecommendationResultProps) {
+  if (!recommendation.ok) {
+    return (
+      <View style={styles.goalResultSection}>
+        <Text style={styles.goalResultTitle}>추천 결과</Text>
+        {recommendation.errors.map((error) => (
+          <Text key={error.code} style={styles.goalErrorText}>
+            {error.message}
+          </Text>
+        ))}
+        <Text style={styles.goalDisclaimerText}>
+          인바디 결과와 계산 결과는 의료 진단이 아니라 참고용 추천입니다.
+        </Text>
+      </View>
+    );
+  }
+
+  const resultRows: Array<{ label: string; value: string }> = [
+    { label: '계산 모드', value: goalCalculationModeLabels[recommendation.mode] },
+    { label: '선택된 BMR', value: formatKcalValue(recommendation.selectedBmrKcal) },
+    { label: 'Mifflin BMR', value: formatKcalValue(recommendation.mifflinBmrKcal) },
+    { label: 'TDEE', value: formatKcalValue(recommendation.tdeeKcal) },
+    { label: 'BMI', value: formatBmiValue(recommendation.bmi) },
+    { label: 'BMI 분류', value: bmiCategoryLabels[recommendation.bmiCategory] },
+    { label: '목표 칼로리', value: formatKcalValue(recommendation.targets.caloriesKcal ?? 0) },
+    { label: '목표 단백질', value: formatGramValue(recommendation.targets.proteinG ?? 0) },
+    { label: '목표 탄수화물', value: formatGramValue(recommendation.targets.carbohydrateG ?? 0) },
+    { label: '목표 지방', value: formatGramValue(recommendation.targets.fatG ?? 0) },
+  ];
+
+  if (recommendation.inBodyBmrKcal !== null) {
+    resultRows.splice(3, 0, {
+      label: '인바디 BMR',
+      value: formatKcalValue(recommendation.inBodyBmrKcal),
+    });
+  }
+
+  return (
+    <View style={styles.goalResultSection}>
+      <Text style={styles.goalResultTitle}>추천 결과</Text>
+      <View style={styles.goalResultGrid}>
+        {resultRows.map((row) => (
+          <View key={row.label} style={styles.goalResultItem}>
+            <Text style={styles.goalResultLabel}>{row.label}</Text>
+            <Text style={styles.goalResultValue}>{row.value}</Text>
+          </View>
+        ))}
+      </View>
+
+      <Text style={styles.goalDisclaimerText}>
+        인바디 결과와 계산 결과는 의료 진단이 아니라 참고용 추천입니다.
+      </Text>
+
+      <View style={styles.goalWarningList}>
+        <Text style={styles.goalResultTitle}>주의 사항</Text>
+        {recommendation.warnings.length > 0 ? (
+          recommendation.warnings.map((warning) => (
+            <Text key={warning.code} style={styles.goalWarningText}>
+              {warning.message}
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.goalHelpText}>현재 표시할 주의 사항이 없습니다.</Text>
+        )}
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={onApplyTargets}
+        style={({ pressed }) => [
+          styles.applyGoalButton,
+          pressed ? styles.applyGoalButtonPressed : null,
+        ]}
+      >
+        <Text style={styles.applyGoalButtonText}>목표 적용</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -604,17 +1114,21 @@ function MissingNutritionNotice({ missingFields }: MissingNutritionNoticeProps) 
 type ProgressMetricProps = {
   field: PrimaryNutritionField;
   isMissing: boolean;
+  target: number | null;
   value: number | null;
 };
 
-function ProgressMetric({ field, isMissing, value }: ProgressMetricProps) {
-  const target = dailyTargets[field] ?? 1;
-  const progressRatio = value === null ? 0 : Math.min(value / target, 1);
+function ProgressMetric({ field, isMissing, target, value }: ProgressMetricProps) {
+  const hasUsableTarget = target !== null && Number.isFinite(target) && target > 0;
+  const progressTarget = hasUsableTarget ? target : 1;
+  const progressRatio = value === null ? 0 : Math.min(value / progressTarget, 1);
   const progressWidth = `${Math.round(progressRatio * 100)}%` as `${number}%`;
   const valueLabel = formatNutritionValue(field, value);
   const targetLabel = formatNutritionValue(field, target);
   const progressLabel =
-    value === null ? '0%' : `${Math.round((value / target) * 100)}%`;
+    value === null || !hasUsableTarget
+      ? '0%'
+      : `${Math.round((value / target) * 100)}%`;
 
   return (
     <View style={styles.metricBlock}>
@@ -1611,6 +2125,229 @@ const styles = StyleSheet.create({
   },
   portionButtonPressed: {
     opacity: 0.72,
+  },
+  goalPanel: {
+    backgroundColor: '#ffffff',
+    borderColor: '#dde6d8',
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 18,
+  },
+  goalQuestionBlock: {
+    gap: 10,
+    marginTop: 16,
+  },
+  goalQuestionText: {
+    color: '#172016',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  segmentButton: {
+    alignItems: 'center',
+    backgroundColor: '#eef3ec',
+    borderColor: '#d7e1d2',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 38,
+    minWidth: 78,
+    paddingHorizontal: 12,
+  },
+  segmentButtonActive: {
+    backgroundColor: '#245f73',
+    borderColor: '#245f73',
+  },
+  segmentButtonPressed: {
+    opacity: 0.72,
+  },
+  segmentButtonText: {
+    color: '#536250',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  segmentButtonTextActive: {
+    color: '#ffffff',
+  },
+  goalFormGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 16,
+  },
+  goalInputGroup: {
+    flexGrow: 1,
+    minWidth: 136,
+  },
+  goalFieldLabel: {
+    color: '#40503d',
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  goalInputRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  goalTextInput: {
+    backgroundColor: '#fbfcfa',
+    borderColor: '#cfdac9',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#172016',
+    flex: 1,
+    fontSize: 15,
+    minHeight: 42,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  goalUnitText: {
+    color: '#40503d',
+    fontSize: 13,
+    fontWeight: '800',
+    minWidth: 28,
+  },
+  goalChoiceSection: {
+    gap: 8,
+    marginTop: 16,
+  },
+  goalHelpText: {
+    color: '#687265',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  activityList: {
+    gap: 8,
+  },
+  activityOption: {
+    backgroundColor: '#fbfcfa',
+    borderColor: '#d7e1d2',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  activityOptionActive: {
+    backgroundColor: '#e9f3f7',
+    borderColor: '#245f73',
+  },
+  activityLabel: {
+    color: '#263324',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  activityLabelActive: {
+    color: '#18485a',
+  },
+  activityDescription: {
+    color: '#687265',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  activityDescriptionActive: {
+    color: '#2b5e70',
+  },
+  inBodySection: {
+    borderTopColor: '#e5ebe1',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 16,
+    paddingTop: 16,
+  },
+  goalSubsectionTitle: {
+    color: '#172016',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  goalResultSection: {
+    borderTopColor: '#e5ebe1',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+    marginTop: 18,
+    paddingTop: 16,
+  },
+  goalResultTitle: {
+    color: '#172016',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  goalResultGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  goalResultItem: {
+    backgroundColor: '#f1f5ef',
+    borderRadius: 8,
+    flexGrow: 1,
+    minWidth: 126,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  goalResultLabel: {
+    color: '#687265',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  goalResultValue: {
+    color: '#172016',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  goalDisclaimerText: {
+    color: '#536250',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  goalWarningList: {
+    gap: 8,
+  },
+  goalWarningText: {
+    backgroundColor: '#fff8e6',
+    borderColor: '#f0bf4c',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#7a4a00',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    padding: 10,
+  },
+  goalErrorText: {
+    backgroundColor: '#fff2ed',
+    borderColor: '#f2c2b4',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#9a2e00',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    padding: 10,
+  },
+  applyGoalButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#245f73',
+    borderRadius: 8,
+    justifyContent: 'center',
+    minHeight: 40,
+    minWidth: 96,
+    paddingHorizontal: 14,
+  },
+  applyGoalButtonPressed: {
+    opacity: 0.72,
+  },
+  applyGoalButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
   },
   disclaimer: {
     color: '#687265',
