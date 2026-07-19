@@ -1,10 +1,44 @@
-import { Food, Meal, MealFood, MealType } from './models';
+import type { Food, Meal, MealFood, MealsByDate, MealType } from './models';
 import { calculateNutritionForConsumedGrams } from './nutrition';
 
 export type AddFoodToMealsOptions = {
   createMealFoodId: (foodId: string) => string;
   updatedAt: string;
 };
+
+export const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner'];
+
+export function createEmptyMealsForDate(
+  date: string,
+  timestamp = new Date().toISOString(),
+): Meal[] {
+  return mealTypes.map((type) => ({
+    id: `meal-${date}-${type}`,
+    date,
+    type,
+    foods: [],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }));
+}
+
+export function getMealsForDate(mealsByDate: MealsByDate, date: string): Meal[] {
+  return mealsByDate[date] ?? createEmptyMealsForDate(date);
+}
+
+export function updateMealsForDate(
+  mealsByDate: MealsByDate,
+  date: string,
+  updateMeals: (meals: Meal[]) => Meal[],
+  timestamp = new Date().toISOString(),
+): MealsByDate {
+  const currentMeals = mealsByDate[date] ?? createEmptyMealsForDate(date, timestamp);
+
+  return {
+    ...mealsByDate,
+    [date]: updateMeals(currentMeals),
+  };
+}
 
 export function normalizeConsumedGrams(consumedGrams: number): number {
   return Number.isFinite(consumedGrams) && consumedGrams > 0

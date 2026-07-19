@@ -46,6 +46,8 @@ export type Meal = {
   updatedAt: string;
 };
 
+export type MealsByDate = Record<string, Meal[]>;
+
 export type MealSummary = {
   mealId: string;
   type: MealType;

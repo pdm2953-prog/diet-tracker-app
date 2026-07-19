@@ -20,7 +20,7 @@ Push-Location $repoRoot
 try {
   Remove-TestDist
   npx tsc -p tsconfig.test.json
-  node --test .test-dist/tests/nutrition.test.js .test-dist/tests/meals.test.js
+  node --test .test-dist/tests/nutrition.test.js .test-dist/tests/meals.test.js .test-dist/tests/mealEvaluation.test.js
 } finally {
   Remove-TestDist
   Pop-Location

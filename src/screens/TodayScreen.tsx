@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { FoodPortionModal } from '../components/FoodPortionModal';
 import type { FoodPortionModalState } from '../components/FoodPortionModal';
@@ -9,11 +9,18 @@ import { NutritionSummaryPanel } from '../components/NutritionSummaryPanel';
 import { GRAM_ADJUST_STEP } from '../constants';
 import {
   addFoodToMeals,
+  getMealsForDate,
   hasValidGramServing,
   normalizeConsumedGrams,
+  updateMealsForDate,
 } from '../meals';
+import {
+  evaluateDailyMeal,
+  mealEvaluationStatusLabels,
+} from '../mealEvaluation';
+import type { MealEvaluationResult } from '../mealEvaluation';
 import { createMockTodayData } from '../mockTodayData';
-import type { Food, Meal, MealType } from '../models';
+import type { Food, Meal, MealsByDate, MealType } from '../models';
 import {
   buildDailySummary,
   calculateNutritionForConsumedGrams,
@@ -30,6 +37,7 @@ import {
   formatDateLabel,
   getLocalDateString,
   parseNumberInput,
+  shiftLocalDateString,
 } from '../utils/format';
 
 let mealFoodIdSequence = 0;
@@ -44,11 +52,23 @@ function createMealFoodId(foodId: string): string {
   return `meal-food-${foodId}-${Date.now()}-${mealFoodIdSequence}`;
 }
 
+function createInitialTodayScreenData() {
+  const initialDate = getLocalDateString();
+
+  return {
+    date: initialDate,
+    mockData: createMockTodayData(initialDate),
+  };
+}
+
 export function TodayScreen({ targets }: TodayScreenProps) {
-  const today = useMemo(() => getLocalDateString(), []);
-  const mockData = useMemo(() => createMockTodayData(today), [today]);
-  const [foods, setFoods] = useState<Food[]>(() => mockData.foods);
-  const [meals, setMeals] = useState<Meal[]>(() => mockData.meals);
+  const [initialData] = useState(createInitialTodayScreenData);
+  const currentToday = getLocalDateString();
+  const [selectedDate, setSelectedDate] = useState(initialData.date);
+  const [foods, setFoods] = useState<Food[]>(() => initialData.mockData.foods);
+  const [mealsByDate, setMealsByDate] = useState<MealsByDate>(() => ({
+    [initialData.date]: initialData.mockData.meals,
+  }));
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -57,6 +77,10 @@ export function TodayScreen({ targets }: TodayScreenProps) {
   const [activeSearchMealType, setActiveSearchMealType] = useState<MealType | null>(null);
   const [portionModal, setPortionModal] = useState<FoodPortionModalState | null>(null);
   const [portionGramsInput, setPortionGramsInput] = useState('');
+  const selectedMeals = useMemo(
+    () => getMealsForDate(mealsByDate, selectedDate),
+    [mealsByDate, selectedDate],
+  );
   const foodsById = useMemo<Record<string, Food>>(
     () =>
       Object.fromEntries(
@@ -65,14 +89,27 @@ export function TodayScreen({ targets }: TodayScreenProps) {
     [foods],
   );
   const dailySummary = useMemo(
-    () => buildDailySummary(today, meals),
-    [meals, today],
+    () => buildDailySummary(selectedDate, selectedMeals),
+    [selectedDate, selectedMeals],
   );
+  const mealEvaluation = useMemo(
+    () => evaluateDailyMeal(dailySummary, targets),
+    [dailySummary, targets],
+  );
+
+  const updateSelectedDateMeals = (
+    updatedAt: string,
+    updateMeals: (currentMeals: Meal[]) => Meal[],
+  ) => {
+    setMealsByDate((currentMealsByDate) =>
+      updateMealsForDate(currentMealsByDate, selectedDate, updateMeals, updatedAt),
+    );
+  };
 
   const toggleMealFood = (mealId: string, mealFoodId: string) => {
     const updatedAt = new Date().toISOString();
 
-    setMeals((currentMeals) =>
+    updateSelectedDateMeals(updatedAt, (currentMeals) =>
       currentMeals.map((meal) => {
         if (meal.id !== mealId) {
           return meal;
@@ -107,6 +144,23 @@ export function TodayScreen({ targets }: TodayScreenProps) {
   const closeFoodSearch = () => {
     setActiveSearchMealType(null);
     resetFoodSearchState();
+  };
+
+  const closePortionModal = () => {
+    setPortionModal(null);
+    setPortionGramsInput('');
+  };
+
+  const changeSelectedDate = (dayDelta: number) => {
+    closeFoodSearch();
+    closePortionModal();
+    setSelectedDate((currentDate) => shiftLocalDateString(currentDate, dayDelta));
+  };
+
+  const returnToToday = () => {
+    closeFoodSearch();
+    closePortionModal();
+    setSelectedDate(getLocalDateString());
   };
 
   useEffect(() => {
@@ -169,17 +223,12 @@ export function TodayScreen({ targets }: TodayScreenProps) {
         : [...currentFoods, food],
     );
 
-    setMeals((currentMeals) =>
+    updateSelectedDateMeals(updatedAt, (currentMeals) =>
       addFoodToMeals(currentMeals, food, mealType, normalizedConsumedGrams, {
         createMealFoodId,
         updatedAt,
       }),
     );
-  };
-
-  const closePortionModal = () => {
-    setPortionModal(null);
-    setPortionGramsInput('');
   };
 
   const openPortionModal = (food: FoodSearchResult, mealType: MealType) => {
@@ -213,7 +262,7 @@ export function TodayScreen({ targets }: TodayScreenProps) {
   ) => {
     const updatedAt = new Date().toISOString();
 
-    setMeals((currentMeals) =>
+    updateSelectedDateMeals(updatedAt, (currentMeals) =>
       currentMeals.map((meal) => {
         if (meal.id !== mealId) {
           return meal;
@@ -267,7 +316,7 @@ export function TodayScreen({ targets }: TodayScreenProps) {
   const removeMealFood = (mealId: string, mealFoodId: string) => {
     const updatedAt = new Date().toISOString();
 
-    setMeals((currentMeals) =>
+    updateSelectedDateMeals(updatedAt, (currentMeals) =>
       currentMeals.map((meal) => {
         if (meal.id !== mealId) {
           return meal;
@@ -287,14 +336,55 @@ export function TodayScreen({ targets }: TodayScreenProps) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Today</Text>
-          <Text style={styles.title}>오늘 식단</Text>
-          <Text style={styles.dateText}>{formatDateLabel(today)}</Text>
+          <Text style={styles.title}>선택 날짜 식단</Text>
+          <Text style={styles.dateText}>{formatDateLabel(selectedDate)}</Text>
+          <View style={styles.dateControlRow}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => changeSelectedDate(-1)}
+              style={({ pressed }) => [
+                styles.dateControlButton,
+                pressed ? styles.dateControlButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.dateControlButtonText}>이전</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={returnToToday}
+              style={({ pressed }) => [
+                styles.dateControlButton,
+                selectedDate === currentToday ? styles.dateControlButtonActive : null,
+                pressed ? styles.dateControlButtonPressed : null,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.dateControlButtonText,
+                  selectedDate === currentToday ? styles.dateControlButtonTextActive : null,
+                ]}
+              >
+                오늘
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => changeSelectedDate(1)}
+              style={({ pressed }) => [
+                styles.dateControlButton,
+                pressed ? styles.dateControlButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.dateControlButtonText}>다음</Text>
+            </Pressable>
+          </View>
         </View>
 
         <NutritionSummaryPanel summary={dailySummary} targets={targets} />
+        <MealEvaluationPanel evaluation={mealEvaluation} />
 
         <View style={styles.mealStack}>
-          {meals.map((meal) => (
+          {selectedMeals.map((meal) => (
             <MealSection
               key={meal.id}
               foodsById={foodsById}
@@ -335,5 +425,33 @@ export function TodayScreen({ targets }: TodayScreenProps) {
         state={portionModal}
       />
     </>
+  );
+}
+
+type MealEvaluationPanelProps = {
+  evaluation: MealEvaluationResult;
+};
+
+function MealEvaluationPanel({ evaluation }: MealEvaluationPanelProps) {
+  return (
+    <View style={styles.evaluationPanel}>
+      <View style={styles.evaluationHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>식단 평가</Text>
+          <Text style={styles.sectionSubtitle}>체크한 음식과 목표 영양성분 기준</Text>
+        </View>
+        <Text style={styles.evaluationStatusBadge}>
+          {mealEvaluationStatusLabels[evaluation.status]}
+        </Text>
+      </View>
+      <Text style={styles.evaluationScoreText}>{evaluation.score}점</Text>
+      <View style={styles.evaluationMessageList}>
+        {evaluation.messages.map((message, index) => (
+          <Text key={`${evaluation.status}-${index}-${message}`} style={styles.evaluationMessageText}>
+            - {message}
+          </Text>
+        ))}
+      </View>
+    </View>
   );
 }
