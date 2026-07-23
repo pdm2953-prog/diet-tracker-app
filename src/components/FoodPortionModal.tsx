@@ -1,5 +1,6 @@
 import { Modal, Pressable, Text, TextInput, View } from 'react-native';
 
+import { colors } from '../constants';
 import { hasValidGramServing } from '../meals';
 import type { MealType } from '../models';
 import {
@@ -11,6 +12,7 @@ import {
 import type { FoodSearchResult } from '../services/foodSearch';
 import { styles } from '../styles';
 import { formatServingText, parseNumberInput } from '../utils/format';
+import { NoticeBox, PrimaryButton, SecondaryButton } from './ui';
 
 export type FoodPortionModalState = {
   food: FoodSearchResult;
@@ -63,12 +65,20 @@ export function FoodPortionModal({
     >
       <View style={styles.modalOverlay}>
         <Pressable
-          accessibilityLabel="섭취량 입력 닫기"
-          accessibilityRole="button"
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
           onPress={onClose}
           style={styles.modalScrim}
         />
-        <View style={styles.portionModal}>
+        <View
+          accessibilityLabel={`${state.food.name} 섭취량 입력 대화상자`}
+          role="dialog"
+          accessibilityViewIsModal
+          aria-modal={true}
+          importantForAccessibility="yes"
+          style={styles.portionModal}
+        >
           <Text style={styles.portionModalTitle}>얼마나 드셨나요?</Text>
           <Text style={styles.portionFoodName}>{state.food.name}</Text>
           <Text style={styles.portionServingText}>
@@ -82,7 +92,7 @@ export function FoodPortionModal({
               keyboardType="decimal-pad"
               onChangeText={onChangeGramsInput}
               placeholder="50"
-              placeholderTextColor="#8b9588"
+              placeholderTextColor={colors.textSoft}
               selectTextOnFocus
               style={styles.portionInput}
               value={gramsInput}
@@ -105,40 +115,23 @@ export function FoodPortionModal({
               </View>
             </View>
           ) : (
-            <Text style={styles.portionErrorText}>{portionErrorMessage}</Text>
+            <NoticeBox message={portionErrorMessage} title="입력 확인" variant="danger" />
           )}
 
           <View style={styles.portionButtonRow}>
-            <Pressable
-              accessibilityRole="button"
+            <SecondaryButton
+              label="취소"
               onPress={onClose}
-              style={({ pressed }) => [
-                styles.portionCancelButton,
-                pressed ? styles.portionButtonPressed : null,
-              ]}
-            >
-              <Text style={styles.portionCancelButtonText}>취소</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !canConfirm }}
+              style={styles.portionCancelButton}
+              textStyle={styles.portionCancelButtonText}
+            />
+            <PrimaryButton
               disabled={!canConfirm}
+              label="확인"
               onPress={onConfirm}
-              style={({ pressed }) => [
-                styles.portionConfirmButton,
-                !canConfirm ? styles.portionConfirmButtonDisabled : null,
-                pressed && canConfirm ? styles.portionButtonPressed : null,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.portionConfirmButtonText,
-                  !canConfirm ? styles.portionConfirmButtonDisabledText : null,
-                ]}
-              >
-                확인
-              </Text>
-            </Pressable>
+              style={styles.portionConfirmButton}
+              textStyle={styles.portionConfirmButtonText}
+            />
           </View>
         </View>
       </View>

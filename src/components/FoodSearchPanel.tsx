@@ -1,6 +1,6 @@
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
-import { mealLabels } from '../constants';
+import { colors, mealLabels } from '../constants';
 import { hasValidGramServing } from '../meals';
 import type { MealType } from '../models';
 import {
@@ -12,6 +12,7 @@ import type { FoodSearchResult } from '../services/foodSearch';
 import { styles } from '../styles';
 import { formatServingText } from '../utils/format';
 import { getMissingPrimaryFields } from '../utils/nutritionUi';
+import { NoticeBox, PrimaryButton, SecondaryButton } from './ui';
 
 type FoodSearchPanelProps = {
   hasSearched: boolean;
@@ -37,57 +38,81 @@ export function FoodSearchPanel({
   searchError,
 }: FoodSearchPanelProps) {
   return (
-    <View style={styles.searchPanel}>
-      <View style={styles.searchHeader}>
-        <Text style={styles.sectionTitle}>{mealLabels[mealType]} 음식 추가</Text>
+    <Modal
+      animationType="fade"
+      onRequestClose={onClose}
+      transparent
+      visible
+    >
+      <View style={styles.modalOverlay}>
         <Pressable
-          accessibilityLabel="음식 검색 닫기"
-          accessibilityRole="button"
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
           onPress={onClose}
-          style={({ pressed }) => [
-            styles.searchCloseButton,
-            pressed ? styles.searchCloseButtonPressed : null,
-          ]}
-        >
-          <Text style={styles.searchCloseButtonText}>닫기</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.searchInputRow}>
-        <TextInput
-          accessibilityLabel={`${mealLabels[mealType]} 음식명 입력`}
-          autoFocus
-          onChangeText={onQueryChange}
-          placeholder={`${mealLabels[mealType]} 음식명 입력`}
-          placeholderTextColor="#8b9588"
-          returnKeyType="search"
-          style={styles.searchInput}
-          value={query}
+          style={styles.modalScrim}
         />
-      </View>
+        <View
+          accessibilityLabel={`${mealLabels[mealType]} 음식 검색 대화상자`}
+          accessibilityViewIsModal
+          aria-modal={true}
+          role="dialog"
+          importantForAccessibility="yes"
+          style={styles.searchPanel}
+        >
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={styles.searchHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>{mealLabels[mealType]} 음식 추가</Text>
+                <Text style={styles.sectionSubtitle}>음식명을 검색한 뒤 섭취 g수를 입력합니다.</Text>
+              </View>
+              <SecondaryButton
+                accessibilityLabel="닫기"
+                label="닫기"
+                onPress={onClose}
+                style={styles.searchCloseButton}
+                textStyle={styles.searchCloseButtonText}
+              />
+            </View>
 
-      {isSearching ? <Text style={styles.searchMessageText}>검색 중</Text> : null}
+            <View style={styles.searchInputRow}>
+              <TextInput
+                accessibilityLabel={`${mealLabels[mealType]} 음식명 입력`}
+                autoFocus
+                onChangeText={onQueryChange}
+                placeholder={`${mealLabels[mealType]} 음식명 입력`}
+                placeholderTextColor={colors.textSoft}
+                returnKeyType="search"
+                style={styles.searchInput}
+                value={query}
+              />
+            </View>
 
-      {searchError !== null ? (
-        <Text style={styles.searchErrorText}>{searchError}</Text>
-      ) : null}
+            {isSearching ? <Text style={styles.searchMessageText}>검색 중</Text> : null}
 
-      {hasSearched && !isSearching && searchError === null && results.length === 0 ? (
-        <Text style={styles.searchMessageText}>검색 결과 없음</Text>
-      ) : null}
+            {searchError !== null ? (
+              <NoticeBox message={searchError} title="검색 오류" variant="danger" />
+            ) : null}
 
-      {results.length > 0 ? (
-        <View style={styles.searchResultList}>
-          {results.map((food) => (
-            <FoodSearchResultCard
-              key={food.id}
-              food={food}
-              onSelectFood={onSelectFood}
-            />
-          ))}
+            {hasSearched && !isSearching && searchError === null && results.length === 0 ? (
+              <NoticeBox message="검색 결과가 없습니다." title="결과 없음" />
+            ) : null}
+
+            {results.length > 0 ? (
+              <View style={styles.searchResultList}>
+                {results.map((food) => (
+                  <FoodSearchResultCard
+                    key={food.id}
+                    food={food}
+                    onSelectFood={onSelectFood}
+                  />
+                ))}
+              </View>
+            ) : null}
+          </ScrollView>
         </View>
-      ) : null}
-    </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -116,6 +141,14 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
         ) : null}
       </View>
 
+      {!canAddFood ? (
+        <NoticeBox
+          message="기준 g 제공량이 없어 섭취량 계산을 할 수 없습니다."
+          title="추가 불가"
+          variant="warning"
+        />
+      ) : null}
+
       <View style={styles.searchNutritionGrid}>
         {primaryNutritionFields.map((field) => (
           <View key={field} style={styles.searchNutritionItem}>
@@ -127,31 +160,14 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
         ))}
       </View>
 
-      <Pressable
+      <PrimaryButton
         accessibilityLabel={canAddFood ? `${food.name} 추가` : `${food.name} 추가 불가`}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: !canAddFood }}
         disabled={!canAddFood}
-        onPress={() => {
-          if (canAddFood) {
-            onSelectFood(food);
-          }
-        }}
-        style={({ pressed }) => [
-          styles.selectFoodButton,
-          !canAddFood ? styles.selectFoodButtonDisabled : null,
-          pressed && canAddFood ? styles.selectFoodButtonPressed : null,
-        ]}
-      >
-        <Text
-          style={[
-            styles.selectFoodButtonText,
-            !canAddFood ? styles.selectFoodButtonDisabledText : null,
-          ]}
-        >
-          {canAddFood ? '추가' : '추가 불가'}
-        </Text>
-      </Pressable>
+        label={canAddFood ? '추가' : '추가 불가'}
+        onPress={() => onSelectFood(food)}
+        style={styles.selectFoodButton}
+        textStyle={styles.selectFoodButtonText}
+      />
     </View>
   );
 }

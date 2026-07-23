@@ -15,6 +15,7 @@ import {
 import { styles } from '../styles';
 import { formatAmountLabel, formatServingText } from '../utils/format';
 import { isPrimaryNutritionField } from '../utils/nutritionUi';
+import { Card } from './ui';
 
 type MealSectionProps = {
   foodsById: Record<string, Food>;
@@ -43,7 +44,7 @@ export function MealSection({
   const protein = summary?.checkedNutritionTotal.proteinG ?? null;
 
   return (
-    <View style={styles.mealSection}>
+    <Card style={styles.mealSection}>
       <View style={styles.mealHeader}>
         <View>
           <View style={styles.mealTitleRow}>
@@ -100,7 +101,7 @@ export function MealSection({
           <Text style={styles.emptyMealText}>추가된 음식 없음</Text>
         )}
       </View>
-    </View>
+    </Card>
   );
 }
 
@@ -159,9 +160,15 @@ function FoodRow({
 
       <View style={styles.foodContent}>
         <View style={styles.foodHeader}>
-          <Text style={styles.foodName}>
-            {foodName} {formatAmountLabel(consumedGrams)}g
-          </Text>
+          <View style={styles.foodTitleBlock}>
+            <View style={styles.foodNameRow}>
+              <Text style={styles.foodName}>{foodName}</Text>
+              <Text style={styles.foodGramsBadge}>{formatAmountLabel(consumedGrams)}g</Text>
+            </View>
+            <Text style={styles.foodMeta}>
+              {food?.category ?? '분류 없음'} · 기준 {food ? formatServingText(food) : '정보 없음'}
+            </Text>
+          </View>
           <View style={styles.gramsControl}>
             <Pressable
               accessibilityLabel={`${foodName} 섭취량 10g 감소`}
@@ -198,9 +205,6 @@ function FoodRow({
             </Pressable>
           </View>
         </View>
-        <Text style={styles.foodMeta}>
-          {food?.category ?? '분류 없음'} · 기준 {food ? formatServingText(food) : '정보 없음'}
-        </Text>
 
         <View style={styles.foodNutritionLine}>
           {primaryNutritionFields.map((field) => (

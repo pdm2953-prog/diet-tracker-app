@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
 
+import { Card, MacroProgressRow, WarningBox } from './ui';
 import type { DailySummary, NutritionField } from '../models';
 import {
   formatNutritionValue,
@@ -20,7 +21,7 @@ export function NutritionSummaryPanel({
   targets,
 }: NutritionSummaryPanelProps) {
   return (
-    <View style={styles.summaryPanel}>
+    <Card style={styles.summaryPanelHero}>
       <View style={styles.summaryHeader}>
         <View>
           <Text style={styles.sectionTitle}>하루 섭취량</Text>
@@ -44,7 +45,7 @@ export function NutritionSummaryPanel({
           />
         ))}
       </View>
-    </View>
+    </Card>
   );
 }
 
@@ -62,12 +63,10 @@ function MissingNutritionNotice({ missingFields }: MissingNutritionNoticeProps) 
   }
 
   return (
-    <View style={styles.warningPanel}>
-      <Text style={styles.warningTitle}>일부 영양정보 없음</Text>
-      <Text style={styles.warningBody}>
-        {missingFieldNames.join(', ')} 값이 없는 음식은 해당 항목 합산에서 제외했습니다.
-      </Text>
-    </View>
+    <WarningBox
+      message={`${missingFieldNames.join(', ')} 값이 없는 음식은 해당 항목 합산에서 제외했습니다.`}
+      title="일부 영양정보 없음"
+    />
   );
 }
 
@@ -79,34 +78,25 @@ type ProgressMetricProps = {
 };
 
 function ProgressMetric({ field, isMissing, target, value }: ProgressMetricProps) {
-  const hasUsableTarget = target !== null && Number.isFinite(target) && target > 0;
-  const progressTarget = hasUsableTarget ? target : 1;
-  const progressRatio = value === null ? 0 : Math.min(value / progressTarget, 1);
-  const progressWidth = `${Math.round(progressRatio * 100)}%` as `${number}%`;
+  const targetValue = target !== null && Number.isFinite(target) && target > 0
+    ? target
+    : null;
+  const progressRatio = value === null || targetValue === null
+    ? 0
+    : Math.min(value / targetValue, 1);
   const valueLabel = formatNutritionValue(field, value);
   const targetLabel = formatNutritionValue(field, target);
-  const progressLabel =
-    value === null || !hasUsableTarget
-      ? '0%'
-      : `${Math.round((value / target) * 100)}%`;
+  const progressLabel = value === null || targetValue === null
+    ? '0%'
+    : `${Math.round((value / targetValue) * 100)}%`;
 
   return (
-    <View style={styles.metricBlock}>
-      <View style={styles.metricTopRow}>
-        <Text style={styles.metricName}>{nutritionLabels[field]}</Text>
-        <Text style={styles.metricValue}>{valueLabel}</Text>
-      </View>
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: progressWidth }]} />
-      </View>
-      <View style={styles.metricMetaRow}>
-        <Text style={styles.metricMetaText}>
-          목표 {targetLabel} 중 {progressLabel}
-        </Text>
-        {isMissing ? (
-          <Text style={styles.metricWarningText}>일부 음식 정보 없음</Text>
-        ) : null}
-      </View>
-    </View>
+    <MacroProgressRow
+      label={nutritionLabels[field]}
+      meta={`목표 ${targetLabel} 중 ${progressLabel}`}
+      progress={progressRatio}
+      value={valueLabel}
+      warning={isMissing ? '일부 음식 정보 없음' : undefined}
+    />
   );
 }

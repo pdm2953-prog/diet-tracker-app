@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { FoodPortionModal } from '../components/FoodPortionModal';
 import type { FoodPortionModalState } from '../components/FoodPortionModal';
 import { FoodSearchPanel } from '../components/FoodSearchPanel';
 import { MealSection } from '../components/MealSection';
 import { NutritionSummaryPanel } from '../components/NutritionSummaryPanel';
+import { Card, PrimaryButton, SecondaryButton } from '../components/ui';
 import { GRAM_ADJUST_STEP } from '../constants';
 import {
   addFoodToMeals,
@@ -331,57 +332,60 @@ export function TodayScreen({ targets }: TodayScreenProps) {
     );
   };
 
+  const selectedDateIsToday = selectedDate === currentToday;
+  const foodSearchIsVisible = portionModal === null;
+
   return (
     <>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Today</Text>
           <Text style={styles.title}>선택 날짜 식단</Text>
-          <Text style={styles.dateText}>{formatDateLabel(selectedDate)}</Text>
-          <View style={styles.dateControlRow}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => changeSelectedDate(-1)}
-              style={({ pressed }) => [
-                styles.dateControlButton,
-                pressed ? styles.dateControlButtonPressed : null,
-              ]}
-            >
-              <Text style={styles.dateControlButtonText}>이전</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={returnToToday}
-              style={({ pressed }) => [
-                styles.dateControlButton,
-                selectedDate === currentToday ? styles.dateControlButtonActive : null,
-                pressed ? styles.dateControlButtonPressed : null,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.dateControlButtonText,
-                  selectedDate === currentToday ? styles.dateControlButtonTextActive : null,
-                ]}
-              >
-                오늘
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => changeSelectedDate(1)}
-              style={({ pressed }) => [
-                styles.dateControlButton,
-                pressed ? styles.dateControlButtonPressed : null,
-              ]}
-            >
-              <Text style={styles.dateControlButtonText}>다음</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.dateText}>날짜별로 아침, 점심, 저녁 식단을 관리합니다.</Text>
         </View>
 
-        <NutritionSummaryPanel summary={dailySummary} targets={targets} />
-        <MealEvaluationPanel evaluation={mealEvaluation} />
+        <View style={styles.todayTopStack}>
+          <Card>
+            <View style={styles.dateCardHeader}>
+              <View>
+                <Text style={styles.sectionSubtitle}>선택 날짜</Text>
+                <Text style={styles.dateValueText}>{formatDateLabel(selectedDate)}</Text>
+              </View>
+              <Text style={styles.dateBadge}>
+                {selectedDateIsToday ? '오늘' : '날짜별 기록'}
+              </Text>
+            </View>
+            <View style={styles.dateControlRow}>
+              <SecondaryButton
+                label="이전"
+                onPress={() => changeSelectedDate(-1)}
+                style={styles.dateControlButton}
+              />
+              {selectedDateIsToday ? (
+                <PrimaryButton
+                  label="오늘"
+                  onPress={returnToToday}
+                  style={[styles.dateControlButton, styles.dateControlButtonActive]}
+                  textStyle={styles.dateControlButtonTextActive}
+                />
+              ) : (
+                <SecondaryButton
+                  label="오늘"
+                  onPress={returnToToday}
+                  style={styles.dateControlButton}
+                />
+              )}
+              <SecondaryButton
+                label="다음"
+                onPress={() => changeSelectedDate(1)}
+                style={styles.dateControlButton}
+              />
+            </View>
+          </Card>
+
+          <NutritionSummaryPanel summary={dailySummary} targets={targets} />
+          <MealEvaluationPanel evaluation={mealEvaluation} />
+        </View>
 
         <View style={styles.mealStack}>
           {selectedMeals.map((meal) => (
@@ -395,7 +399,7 @@ export function TodayScreen({ targets }: TodayScreenProps) {
               onOpenSearch={openFoodSearch}
               onToggle={toggleMealFood}
               searchPanel={
-                activeSearchMealType === meal.type ? (
+                foodSearchIsVisible && activeSearchMealType === meal.type ? (
                   <FoodSearchPanel
                     hasSearched={hasSearched}
                     isSearching={isSearching}
@@ -434,13 +438,13 @@ type MealEvaluationPanelProps = {
 
 function MealEvaluationPanel({ evaluation }: MealEvaluationPanelProps) {
   return (
-    <View style={styles.evaluationPanel}>
+    <Card>
       <View style={styles.evaluationHeader}>
         <View>
           <Text style={styles.sectionTitle}>식단 평가</Text>
           <Text style={styles.sectionSubtitle}>체크한 음식과 목표 영양성분 기준</Text>
         </View>
-        <Text style={styles.evaluationStatusBadge}>
+        <Text style={[styles.evaluationStatusBadge, getEvaluationStatusBadgeStyle(evaluation)]}>
           {mealEvaluationStatusLabels[evaluation.status]}
         </Text>
       </View>
@@ -452,6 +456,18 @@ function MealEvaluationPanel({ evaluation }: MealEvaluationPanelProps) {
           </Text>
         ))}
       </View>
-    </View>
+    </Card>
   );
+}
+
+function getEvaluationStatusBadgeStyle(evaluation: MealEvaluationResult) {
+  if (evaluation.status === 'excellent' || evaluation.status === 'good') {
+    return styles.evaluationStatusBadgeExcellent;
+  }
+
+  if (evaluation.status === 'low' || evaluation.status === 'high') {
+    return styles.evaluationStatusBadgeWarning;
+  }
+
+  return styles.evaluationStatusBadgeDanger;
 }
