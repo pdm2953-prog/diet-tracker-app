@@ -35,6 +35,11 @@ export type MealFood = {
   calculatedNutrition: Nutrition;
   createdAt: string;
   updatedAt: string;
+  generatedFromFixedMealTemplateId?: string;
+  generatedFromFixedMealTemplateItemId?: string;
+  generatedFromFixedMealSourceKey?: string;
+  fixedMealTemplateItemId?: string;
+  sourceKey?: string;
 };
 
 export type Meal = {
@@ -47,6 +52,31 @@ export type Meal = {
 };
 
 export type MealsByDate = Record<string, Meal[]>;
+
+export type FixedMealSchedule = 'daily';
+
+export type FixedMealTemplateItem = {
+  id: string;
+  foodId: string;
+  foodSnapshot: Food;
+  consumedGrams: number;
+  calculatedNutrition: Nutrition;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FixedMealTemplate = {
+  id: string;
+  name: string;
+  mealType: MealType;
+  schedule: FixedMealSchedule;
+  isActive: boolean;
+  items: FixedMealTemplateItem[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type HiddenFixedMealSourceKeysByDate = Record<string, string[]>;
 
 export type MealSummary = {
   mealId: string;

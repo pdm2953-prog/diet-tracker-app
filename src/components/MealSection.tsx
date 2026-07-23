@@ -3,6 +3,7 @@ import type { GestureResponderEvent } from 'react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { mealLabels } from '../constants';
+import { isFixedMealFood } from '../fixedMeals';
 import { normalizeConsumedGrams } from '../meals';
 import type { Food, Meal, MealFood, MealSummary, MealType } from '../models';
 import {
@@ -20,6 +21,7 @@ import { Card } from './ui';
 type MealSectionProps = {
   foodsById: Record<string, Food>;
   meal: Meal;
+  onCreateFixedMeal: (mealId: string, mealFoodId: string) => void;
   onDecreaseGrams: (mealId: string, mealFoodId: string) => void;
   onIncreaseGrams: (mealId: string, mealFoodId: string) => void;
   onOpenSearch: (mealType: MealType) => void;
@@ -32,6 +34,7 @@ type MealSectionProps = {
 export function MealSection({
   foodsById,
   meal,
+  onCreateFixedMeal,
   onDecreaseGrams,
   onIncreaseGrams,
   onOpenSearch,
@@ -91,6 +94,7 @@ export function MealSection({
               food={foodsById[mealFood.foodId]}
               isLast={index === meal.foods.length - 1}
               mealFood={mealFood}
+              onCreateFixedMeal={() => onCreateFixedMeal(meal.id, mealFood.id)}
               onDecreaseGrams={() => onDecreaseGrams(meal.id, mealFood.id)}
               onIncreaseGrams={() => onIncreaseGrams(meal.id, mealFood.id)}
               onPress={() => onToggle(meal.id, mealFood.id)}
@@ -109,6 +113,7 @@ type FoodRowProps = {
   food: Food | undefined;
   isLast: boolean;
   mealFood: MealFood;
+  onCreateFixedMeal: () => void;
   onDecreaseGrams: () => void;
   onIncreaseGrams: () => void;
   onPress: () => void;
@@ -119,6 +124,7 @@ function FoodRow({
   food,
   isLast,
   mealFood,
+  onCreateFixedMeal,
   onDecreaseGrams,
   onIncreaseGrams,
   onPress,
@@ -129,6 +135,7 @@ function FoodRow({
   const missingPrimaryFields = primaryNutritionFields.filter(
     (field) => mealFood.calculatedNutrition[field] === null,
   );
+  const fixedMealFood = isFixedMealFood(mealFood);
   const foodName = food?.name ?? '알 수 없는 음식';
   const handleDecrease = (event: GestureResponderEvent) => {
     event.stopPropagation();
@@ -141,6 +148,10 @@ function FoodRow({
   const handleRemove = (event: GestureResponderEvent) => {
     event.stopPropagation();
     onRemove();
+  };
+  const handleCreateFixedMeal = (event: GestureResponderEvent) => {
+    event.stopPropagation();
+    onCreateFixedMeal();
   };
 
   return (
@@ -163,6 +174,9 @@ function FoodRow({
           <View style={styles.foodTitleBlock}>
             <View style={styles.foodNameRow}>
               <Text style={styles.foodName}>{foodName}</Text>
+              {fixedMealFood ? (
+                <Text style={styles.fixedMealBadge}>고정 식단</Text>
+              ) : null}
               <Text style={styles.foodGramsBadge}>{formatAmountLabel(consumedGrams)}g</Text>
             </View>
             <Text style={styles.foodMeta}>
@@ -192,8 +206,27 @@ function FoodRow({
             >
               <Text style={styles.gramsButtonText}>+10g</Text>
             </Pressable>
+            {fixedMealFood ? (
+              <View style={[styles.pinFoodButton, styles.pinFoodButtonPinned]}>
+                <Text style={[styles.pinFoodButtonText, styles.pinFoodButtonTextPinned]}>
+                  고정됨
+                </Text>
+              </View>
+            ) : (
+              <Pressable
+                accessibilityLabel={`${foodName} 고정 식단 등록`}
+                accessibilityRole="button"
+                onPress={handleCreateFixedMeal}
+                style={({ pressed }) => [
+                  styles.pinFoodButton,
+                  pressed ? styles.gramsButtonPressed : null,
+                ]}
+              >
+                <Text style={styles.pinFoodButtonText}>고정</Text>
+              </Pressable>
+            )}
             <Pressable
-              accessibilityLabel={`${foodName} 제거`}
+              accessibilityLabel={`${foodName} ${fixedMealFood ? '선택 날짜에서 제외' : '삭제'}`}
               accessibilityRole="button"
               onPress={handleRemove}
               style={({ pressed }) => [
@@ -201,7 +234,7 @@ function FoodRow({
                 pressed ? styles.gramsButtonPressed : null,
               ]}
             >
-              <Text style={styles.removeFoodButtonText}>삭제</Text>
+              <Text style={styles.removeFoodButtonText}>{fixedMealFood ? '제외' : '삭제'}</Text>
             </Pressable>
           </View>
         </View>

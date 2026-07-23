@@ -74,7 +74,9 @@ export function addFoodToMeals(
     }
 
     const matchingMealFoods = meal.foods.filter(
-      (mealFood) => mealFood.foodId === food.id,
+      (mealFood) =>
+        mealFood.foodId === food.id
+        && mealFood.generatedFromFixedMealTemplateId === undefined,
     );
 
     if (matchingMealFoods.length > 0) {

@@ -1,4 +1,9 @@
 import type { Food } from '../models';
+export {
+  formatDateToLocalDateString,
+  getLocalDateString,
+  shiftLocalDateString,
+} from './date';
 
 export function formatAmountLabel(amount: number): string {
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(1);
@@ -51,32 +56,6 @@ export function formatGramValue(value: number): string {
 
 export function formatBmiValue(value: number): string {
   return value.toFixed(1);
-}
-
-export function formatDateToLocalDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-}
-
-export function getLocalDateString(): string {
-  return formatDateToLocalDateString(new Date());
-}
-
-export function shiftLocalDateString(date: string, dayDelta: number): string {
-  const [year, month, day] = date.split('-').map(Number);
-
-  if (
-    !Number.isInteger(year)
-    || !Number.isInteger(month)
-    || !Number.isInteger(day)
-  ) {
-    return getLocalDateString();
-  }
-
-  return formatDateToLocalDateString(new Date(year, month - 1, day + dayDelta));
 }
 
 export function formatDateLabel(date: string): string {

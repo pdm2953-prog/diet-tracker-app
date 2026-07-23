@@ -20,7 +20,10 @@ Push-Location $repoRoot
 try {
   Remove-TestDist
   npx tsc -p tsconfig.test.json
-  node --test .test-dist/tests/nutrition.test.js .test-dist/tests/meals.test.js .test-dist/tests/mealEvaluation.test.js
+  $testFiles = Get-ChildItem -Path (Join-Path $testDist 'tests') -Filter '*.test.js' |
+    Sort-Object FullName |
+    ForEach-Object { $_.FullName }
+  node --test @testFiles
 } finally {
   Remove-TestDist
   Pop-Location
