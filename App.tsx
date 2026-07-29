@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import type { ViewStyle } from 'react-native';
-import { Pressable, SafeAreaView, Text, View } from 'react-native';
+import { SafeAreaView, Text, View } from 'react-native';
 
 import {
   applyFixedMealTemplatesToMeals,
@@ -25,6 +25,7 @@ import type {
   MealType,
 } from './src/models';
 import type { DailyNutritionTargets } from './src/nutrition';
+import { BottomTabItem } from './src/components/ui';
 import { CalendarScreen } from './src/screens/CalendarScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { TargetScreen } from './src/screens/TargetScreen';
@@ -49,11 +50,11 @@ type InitialAppState = {
   todayTargets: DailyNutritionTargets;
 };
 
-const screenTabs: Array<{ key: ScreenKey; label: string }> = [
-  { key: 'today', label: '오늘' },
-  { key: 'calendar', label: '식단 일정' },
-  { key: 'target', label: '목표' },
-  { key: 'settings', label: '설정' },
+const screenTabs: Array<{ icon: string; key: ScreenKey; label: string }> = [
+  { icon: '●', key: 'today', label: '오늘' },
+  { icon: '▦', key: 'calendar', label: '식단 일정' },
+  { icon: '◎', key: 'target', label: '목표' },
+  { icon: '⚙', key: 'settings', label: '설정' },
 ];
 
 const screenPaneStyle: ViewStyle = { flex: 1 };
@@ -314,33 +315,16 @@ export default function App() {
       </View>
 
       <View style={styles.tabBar}>
-        {screenTabs.map((tab) => {
-          const selected = activeTab === tab.key;
-
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              key={tab.key}
-              onPress={() => setActiveTab(tab.key)}
-              style={({ pressed }) => [
-                styles.tabButton,
-                tabButtonFillStyle,
-                selected ? styles.tabButtonActive : null,
-                pressed ? styles.tabButtonPressed : null,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.tabButtonText,
-                  selected ? styles.tabButtonTextActive : null,
-                ]}
-              >
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {screenTabs.map((tab) => (
+          <BottomTabItem
+            icon={tab.icon}
+            key={tab.key}
+            label={tab.label}
+            onPress={() => setActiveTab(tab.key)}
+            selected={activeTab === tab.key}
+            style={tabButtonFillStyle}
+          />
+        ))}
       </View>
     </SafeAreaView>
   );

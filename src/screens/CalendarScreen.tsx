@@ -6,11 +6,19 @@ import {
   buildCalendarStatusByDate,
   calendarDayStatusLabels,
   calendarDayStatusShortLabels,
+  countGroupedMealFoods,
   getCalendarDayStatusBadgeTone,
   getCalendarDayStatusMessage,
 } from '../calendar';
 import type { CalendarDayDetails, CalendarDayStatus, MealFoodsByType } from '../calendar';
-import { Card, MacroProgressRow, PrimaryButton } from '../components/ui';
+import {
+  AppCard,
+  IconButton,
+  MacroProgressRow,
+  PrimaryButton,
+  StatusBadge,
+} from '../components/ui';
+import type { StatusBadgeTone } from '../components/ui';
 import { mealLabels } from '../constants';
 import { mealTypes } from '../meals';
 import type {
@@ -112,33 +120,28 @@ export function CalendarScreen({
         <Text style={styles.dateText}>월간 달력에서 날짜별 식단 상태를 확인합니다.</Text>
       </View>
 
-      <Card>
+      <AppCard style={styles.calendarCard}>
         <View style={styles.calendarMonthHeader}>
-          <Pressable
+          <IconButton
             accessibilityLabel="이전 달"
-            accessibilityRole="button"
+            icon="‹"
             onPress={() => moveMonth(-1)}
-            style={({ pressed }) => [
-              styles.calendarNavButton,
-              pressed ? styles.buttonPressed : null,
-            ]}
-          >
-            <Text style={styles.calendarNavButtonText}>‹</Text>
-          </Pressable>
-          <Text style={styles.calendarMonthTitle}>
-            {visibleMonth.year}년 {visibleMonth.month}월
-          </Text>
-          <Pressable
+            style={styles.calendarNavButton}
+            textStyle={styles.calendarNavButtonText}
+          />
+          <View style={styles.calendarMonthTitleBlock}>
+            <Text style={styles.calendarMonthTitle}>
+              {visibleMonth.year}년 {visibleMonth.month}월
+            </Text>
+            <Text style={styles.calendarMonthSubtitle}>날짜별 평가와 예정 식단</Text>
+          </View>
+          <IconButton
             accessibilityLabel="다음 달"
-            accessibilityRole="button"
+            icon="›"
             onPress={() => moveMonth(1)}
-            style={({ pressed }) => [
-              styles.calendarNavButton,
-              pressed ? styles.buttonPressed : null,
-            ]}
-          >
-            <Text style={styles.calendarNavButtonText}>›</Text>
-          </Pressable>
+            style={styles.calendarNavButton}
+            textStyle={styles.calendarNavButtonText}
+          />
         </View>
 
         <View style={styles.calendarWeekHeader}>
@@ -179,20 +182,28 @@ export function CalendarScreen({
                 >
                   {cell.day}
                 </Text>
-                <Text
-                  style={[
-                    styles.calendarStatusPill,
-                    getCalendarStatusPillStyle(status),
-                    selected ? styles.calendarStatusPillSelected : null,
-                  ]}
-                >
-                  {calendarDayStatusShortLabels[status]}
-                </Text>
+                <View style={styles.calendarStatusRow}>
+                  <View
+                    style={[
+                      styles.calendarStatusDot,
+                      getCalendarStatusDotStyle(status),
+                      selected ? styles.calendarStatusDotSelected : null,
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.calendarStatusText,
+                      selected ? styles.calendarStatusTextSelected : null,
+                    ]}
+                  >
+                    {calendarDayStatusShortLabels[status]}
+                  </Text>
+                </View>
               </Pressable>
             );
           })}
         </View>
-      </Card>
+      </AppCard>
 
       <SelectedDateSummaryCard
         details={selectedDayDetails}
@@ -217,21 +228,52 @@ function SelectedDateSummaryCard({
   onOpenToday,
   targets,
 }: SelectedDateSummaryCardProps) {
+  const fixedMealFoodCount = countGroupedMealFoods(details.fixedMealFoodsByType);
+  const directMealFoodCount = countGroupedMealFoods(details.directMealFoodsByType);
+  const calories = details.summary.checkedNutritionTotal.caloriesKcal;
+  const protein = details.summary.checkedNutritionTotal.proteinG;
+
   return (
-    <Card style={styles.calendarSummaryCard}>
+    <AppCard style={styles.calendarSummaryCard}>
       <View style={styles.summaryHeader}>
-        <View>
+        <View style={styles.calendarSummaryTitleBlock}>
           <Text style={styles.sectionTitle}>{formatDateLabel(details.date)}</Text>
           <Text style={styles.sectionSubtitle}>{getCalendarDayStatusMessage(details)}</Text>
         </View>
-        <Text style={[styles.evaluationStatusBadge, getEvaluationStatusBadgeStyle(details.status)]}>
-          {calendarDayStatusLabels[details.status]}
-        </Text>
+        <StatusBadge
+          label={calendarDayStatusLabels[details.status]}
+          tone={getEvaluationStatusBadgeTone(details.status)}
+        />
       </View>
 
-      <Text style={styles.calendarCheckedCountText}>
-        체크한 음식 {details.summary.checkedCount}개 / 전체 {details.summary.totalCount}개
-      </Text>
+      <View style={styles.calendarSummaryTopGrid}>
+        <View style={styles.calendarSummaryMetric}>
+          <Text style={styles.calendarSummaryMetricLabel}>칼로리</Text>
+          <Text style={styles.calendarSummaryMetricValue}>
+            {formatNutritionValue('caloriesKcal', calories)}
+          </Text>
+          <Text style={styles.calendarSummaryMetricMeta}>
+            목표 {formatNutritionValue('caloriesKcal', targets.caloriesKcal)}
+          </Text>
+        </View>
+        <View style={styles.calendarSummaryMetric}>
+          <Text style={styles.calendarSummaryMetricLabel}>단백질</Text>
+          <Text style={styles.calendarSummaryMetricValue}>
+            {formatNutritionValue('proteinG', protein)}
+          </Text>
+          <Text style={styles.calendarSummaryMetricMeta}>
+            목표 {formatNutritionValue('proteinG', targets.proteinG)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.calendarCountRow}>
+        <Text style={styles.calendarCountPill}>
+          체크 {details.summary.checkedCount}/{details.summary.totalCount}개
+        </Text>
+        <Text style={styles.calendarCountPill}>고정 {fixedMealFoodCount}개</Text>
+        <Text style={styles.calendarCountPill}>직접 추가 {directMealFoodCount}개</Text>
+      </View>
 
       <View style={styles.calendarNutrientStack}>
         {primaryNutritionFields.map((field) => (
@@ -250,22 +292,23 @@ function SelectedDateSummaryCard({
           fixed
           foodsById={foodsById}
           mealFoodsByType={details.fixedMealFoodsByType}
-          title="고정 식단 목록"
+          title="고정 식단"
         />
         <MealFoodSummaryList
           emptyText="사용자가 직접 추가한 식단이 없습니다."
           foodsById={foodsById}
           mealFoodsByType={details.directMealFoodsByType}
-          title="직접 추가한 식단 목록"
+          title="직접 추가 식단"
         />
       </View>
 
       <PrimaryButton
+        accessibilityLabel={`${formatDateLabel(details.date)} 식단 보기`}
         label="이 날짜 식단 보기"
         onPress={onOpenToday}
         style={styles.calendarSummaryAction}
       />
-    </Card>
+    </AppCard>
   );
 }
 
@@ -286,6 +329,7 @@ function CalendarNutritionRow({ field, target, value }: CalendarNutritionRowProp
       label={nutritionLabels[field]}
       meta={`목표 대비 ${percentLabel}`}
       progress={progress}
+      tone={getMacroTone(field)}
       value={`${formatNutritionValue(field, value)} / ${formatNutritionValue(field, target)}`}
     />
   );
@@ -365,44 +409,62 @@ function MealFoodSummaryRow({ fixed, food, mealFood }: MealFoodSummaryRowProps) 
   );
 }
 
-function getCalendarStatusPillStyle(status: CalendarDayStatus) {
+function getCalendarStatusDotStyle(status: CalendarDayStatus) {
   if (status === 'excellent' || status === 'good') {
-    return styles.calendarStatusPillGood;
+    return styles.calendarStatusDotGood;
   }
 
   if (status === 'low' || status === 'high') {
-    return styles.calendarStatusPillWarning;
+    return styles.calendarStatusDotWarning;
   }
 
   if (status === 'incomplete') {
-    return styles.calendarStatusPillIncomplete;
+    return styles.calendarStatusDotIncomplete;
   }
 
   if (status === 'scheduled') {
-    return styles.calendarStatusPillScheduled;
+    return styles.calendarStatusDotScheduled;
   }
 
-  return styles.calendarStatusPillEmpty;
+  return styles.calendarStatusDotEmpty;
 }
 
-function getEvaluationStatusBadgeStyle(status: CalendarDayStatus) {
+function getEvaluationStatusBadgeTone(status: CalendarDayStatus): StatusBadgeTone {
   const tone = getCalendarDayStatusBadgeTone(status);
 
   if (tone === 'positive') {
-    return styles.evaluationStatusBadgeExcellent;
+    return 'success';
   }
 
   if (tone === 'warning') {
-    return styles.evaluationStatusBadgeWarning;
+    return 'warning';
   }
 
   if (tone === 'scheduled') {
-    return styles.evaluationStatusBadgeScheduled;
+    return 'scheduled';
   }
 
   if (tone === 'empty') {
-    return styles.calendarEvaluationStatusBadgeEmpty;
+    return 'neutral';
   }
 
-  return styles.evaluationStatusBadgeDanger;
+  return 'danger';
+}
+
+function getMacroTone(
+  field: PrimaryNutritionField,
+): 'calories' | 'carbohydrate' | 'fat' | 'protein' {
+  if (field === 'caloriesKcal') {
+    return 'calories';
+  }
+
+  if (field === 'carbohydrateG') {
+    return 'carbohydrate';
+  }
+
+  if (field === 'fatG') {
+    return 'fat';
+  }
+
+  return 'protein';
 }

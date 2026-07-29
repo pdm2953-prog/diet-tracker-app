@@ -7,7 +7,8 @@ import type { FoodPortionModalState } from '../components/FoodPortionModal';
 import { FoodSearchPanel } from '../components/FoodSearchPanel';
 import { MealSection } from '../components/MealSection';
 import { NutritionSummaryPanel } from '../components/NutritionSummaryPanel';
-import { Card, PrimaryButton, SecondaryButton } from '../components/ui';
+import { PrimaryButton, SecondaryButton, StatusBadge } from '../components/ui';
+import type { StatusBadgeTone } from '../components/ui';
 import { GRAM_ADJUST_STEP } from '../constants';
 import { isFixedMealFood } from '../fixedMeals';
 import {
@@ -358,6 +359,9 @@ export function TodayScreen({
   };
 
   const selectedDateIsToday = selectedDate === currentToday;
+  const selectedDateStatusLabel = getSelectedDateStatusLabel(selectedDateIsToday, shouldEvaluateSelectedDate);
+  const selectedDateStatusTone = getSelectedDateStatusTone(selectedDateIsToday, shouldEvaluateSelectedDate);
+  const selectedDateHelpText = getSelectedDateHelpText(selectedDateIsToday, shouldEvaluateSelectedDate);
   const foodSearchIsVisible = portionModal === null;
 
   return (
@@ -365,49 +369,46 @@ export function TodayScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Today</Text>
-          <Text style={styles.title}>선택 날짜 식단</Text>
-          <Text style={styles.dateText}>날짜별로 아침, 점심, 저녁 식단을 관리합니다.</Text>
+          <View style={styles.todayHeaderRow}>
+            <View style={styles.todayHeaderTextBlock}>
+              <Text style={styles.title}>{formatDateLabel(selectedDate)}</Text>
+              <Text style={styles.dateText}>{selectedDateHelpText}</Text>
+            </View>
+            <StatusBadge label={selectedDateStatusLabel} tone={selectedDateStatusTone} />
+          </View>
+          <View style={styles.dateControlRow}>
+            <SecondaryButton
+              accessibilityLabel="이전 날짜로 이동"
+              label="이전"
+              onPress={() => changeSelectedDate(-1)}
+              style={styles.dateControlButton}
+            />
+            {selectedDateIsToday ? (
+              <PrimaryButton
+                accessibilityLabel="오늘 날짜 선택됨"
+                label="오늘"
+                onPress={returnToToday}
+                style={[styles.dateControlButton, styles.dateControlButtonActive]}
+                textStyle={styles.dateControlButtonTextActive}
+              />
+            ) : (
+              <SecondaryButton
+                accessibilityLabel="오늘 날짜로 이동"
+                label="오늘"
+                onPress={returnToToday}
+                style={styles.dateControlButton}
+              />
+            )}
+            <SecondaryButton
+              accessibilityLabel="다음 날짜로 이동"
+              label="다음"
+              onPress={() => changeSelectedDate(1)}
+              style={styles.dateControlButton}
+            />
+          </View>
         </View>
 
         <View style={styles.todayTopStack}>
-          <Card>
-            <View style={styles.dateCardHeader}>
-              <View>
-                <Text style={styles.sectionSubtitle}>선택 날짜</Text>
-                <Text style={styles.dateValueText}>{formatDateLabel(selectedDate)}</Text>
-              </View>
-              <Text style={styles.dateBadge}>
-                {selectedDateIsToday ? '오늘' : '날짜별 기록'}
-              </Text>
-            </View>
-            <View style={styles.dateControlRow}>
-              <SecondaryButton
-                label="이전"
-                onPress={() => changeSelectedDate(-1)}
-                style={styles.dateControlButton}
-              />
-              {selectedDateIsToday ? (
-                <PrimaryButton
-                  label="오늘"
-                  onPress={returnToToday}
-                  style={[styles.dateControlButton, styles.dateControlButtonActive]}
-                  textStyle={styles.dateControlButtonTextActive}
-                />
-              ) : (
-                <SecondaryButton
-                  label="오늘"
-                  onPress={returnToToday}
-                  style={styles.dateControlButton}
-                />
-              )}
-              <SecondaryButton
-                label="다음"
-                onPress={() => changeSelectedDate(1)}
-                style={styles.dateControlButton}
-              />
-            </View>
-          </Card>
-
           <NutritionSummaryPanel summary={dailySummary} targets={targets} />
           {mealEvaluation === null ? (
             <ScheduledMealNoticePanel />
@@ -464,20 +465,15 @@ export function TodayScreen({
 
 function ScheduledMealNoticePanel() {
   return (
-    <Card>
-      <View style={styles.evaluationHeader}>
-        <View>
-          <Text style={styles.sectionTitle}>예정된 식단입니다</Text>
-          <Text style={styles.sectionSubtitle}>미래 날짜는 실제 섭취 평가를 하지 않습니다.</Text>
-        </View>
-        <Text style={[styles.evaluationStatusBadge, styles.evaluationStatusBadgeScheduled]}>
-          예정
+    <View style={styles.statusBanner}>
+      <StatusBadge icon="•" label="예정" tone="scheduled" />
+      <View style={styles.statusBannerTextBlock}>
+        <Text style={styles.statusBannerTitle}>예정된 식단입니다</Text>
+        <Text style={styles.statusBannerMessage}>
+          미래 날짜는 실제 섭취 평가를 하지 않습니다. 고정 식단은 예정 목록으로 표시되며, 체크한 음식만 섭취량 합계에 반영됩니다.
         </Text>
       </View>
-      <Text style={styles.evaluationMessageText}>
-        고정 식단은 예정 목록으로 표시되며, 체크한 음식만 섭취량 합계에 반영됩니다.
-      </Text>
-    </Card>
+    </View>
   );
 }
 
@@ -487,36 +483,71 @@ type MealEvaluationPanelProps = {
 
 function MealEvaluationPanel({ evaluation }: MealEvaluationPanelProps) {
   return (
-    <Card>
-      <View style={styles.evaluationHeader}>
-        <View>
-          <Text style={styles.sectionTitle}>식단 평가</Text>
-          <Text style={styles.sectionSubtitle}>체크한 음식과 목표 영양성분 기준</Text>
+    <View style={styles.statusBanner}>
+      <StatusBadge
+        label={mealEvaluationStatusLabels[evaluation.status]}
+        tone={getEvaluationStatusBadgeTone(evaluation)}
+      />
+      <View style={styles.statusBannerTextBlock}>
+        <View style={styles.statusBannerTitleRow}>
+          <Text style={styles.statusBannerTitle}>식단 평가</Text>
+          <Text style={styles.statusBannerScore}>{evaluation.score}점</Text>
         </View>
-        <Text style={[styles.evaluationStatusBadge, getEvaluationStatusBadgeStyle(evaluation)]}>
-          {mealEvaluationStatusLabels[evaluation.status]}
-        </Text>
+        <View style={styles.evaluationMessageList}>
+          {evaluation.messages.map((message, index) => (
+            <Text key={`${evaluation.status}-${index}-${message}`} style={styles.statusBannerMessage}>
+              - {message}
+            </Text>
+          ))}
+        </View>
       </View>
-      <Text style={styles.evaluationScoreText}>{evaluation.score}점</Text>
-      <View style={styles.evaluationMessageList}>
-        {evaluation.messages.map((message, index) => (
-          <Text key={`${evaluation.status}-${index}-${message}`} style={styles.evaluationMessageText}>
-            - {message}
-          </Text>
-        ))}
-      </View>
-    </Card>
+    </View>
   );
 }
 
-function getEvaluationStatusBadgeStyle(evaluation: MealEvaluationResult) {
+function getSelectedDateStatusLabel(
+  selectedDateIsToday: boolean,
+  shouldEvaluateSelectedDate: boolean,
+): string {
+  if (!shouldEvaluateSelectedDate) {
+    return '예정';
+  }
+
+  return selectedDateIsToday ? '오늘' : '기록일';
+}
+
+function getSelectedDateStatusTone(
+  selectedDateIsToday: boolean,
+  shouldEvaluateSelectedDate: boolean,
+): StatusBadgeTone {
+  if (!shouldEvaluateSelectedDate) {
+    return 'scheduled';
+  }
+
+  return selectedDateIsToday ? 'success' : 'info';
+}
+
+function getSelectedDateHelpText(
+  selectedDateIsToday: boolean,
+  shouldEvaluateSelectedDate: boolean,
+): string {
+  if (!shouldEvaluateSelectedDate) {
+    return '예정된 식단을 확인하고 필요한 음식을 미리 준비합니다.';
+  }
+
+  return selectedDateIsToday
+    ? '오늘 먹은 음식만 체크하면 칼로리와 영양 목표가 즉시 반영됩니다.'
+    : '선택한 날짜의 아침, 점심, 저녁 기록을 확인합니다.';
+}
+
+function getEvaluationStatusBadgeTone(evaluation: MealEvaluationResult): StatusBadgeTone {
   if (evaluation.status === 'excellent' || evaluation.status === 'good') {
-    return styles.evaluationStatusBadgeExcellent;
+    return 'success';
   }
 
   if (evaluation.status === 'low' || evaluation.status === 'high') {
-    return styles.evaluationStatusBadgeWarning;
+    return 'warning';
   }
 
-  return styles.evaluationStatusBadgeDanger;
+  return 'danger';
 }

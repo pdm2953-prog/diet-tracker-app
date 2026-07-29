@@ -1,14 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { colors, fontSize, radius, spacing } from './constants';
-
-const cardShadow = {
-  shadowColor: '#1b2819',
-  shadowOffset: { height: 4, width: 0 },
-  shadowOpacity: 0.08,
-  shadowRadius: 12,
-  elevation: 2,
-};
+import { colors, fontSize, radius, shadow, spacing, typography } from './constants';
 
 export const styles = StyleSheet.create({
   root: {
@@ -51,46 +43,242 @@ export const styles = StyleSheet.create({
     borderTopColor: colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.xs,
+    minHeight: 72,
+    paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.xs,
   },
   tabButton: {
     alignItems: 'center',
-    borderRadius: radius.md,
+    borderRadius: radius.large,
+    flex: 1,
+    gap: spacing.xxs,
     justifyContent: 'center',
-    minHeight: 46,
-    paddingHorizontal: spacing.md,
+    minHeight: 56,
+    minWidth: 64,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
   },
   tabButtonActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primarySoft,
   },
   tabButtonPressed: {
     opacity: 0.72,
   },
+  tabIndicator: {
+    backgroundColor: 'transparent',
+    borderRadius: radius.pill,
+    height: 3,
+    width: 22,
+  },
+  tabIndicatorActive: {
+    backgroundColor: colors.primary,
+  },
+  tabIconText: {
+    color: colors.textMuted,
+    fontSize: fontSize.lg,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.lg,
+  },
   tabButtonText: {
     color: colors.textMuted,
-    fontSize: fontSize.md,
-    fontWeight: '800',
+    fontSize: fontSize.sm,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.sm,
+    textAlign: 'center',
   },
   tabButtonTextActive: {
-    color: colors.surface,
+    color: colors.primary,
   },
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radius.card,
+    borderRadius: radius.large,
     borderWidth: 1,
     padding: spacing.lg,
-    ...cardShadow,
+  },
+  cardHero: {
+    borderColor: '#d6e3d2',
+    padding: spacing.xl,
+    ...shadow.hero,
+  },
+  cardModal: {
+    ...shadow.modal,
+  },
+  cardElevated: {
+    ...shadow.hero,
   },
   cardMuted: {
     backgroundColor: colors.surfaceMuted,
   },
+  sectionHeaderRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+  },
+  sectionHeaderTextBlock: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  sectionEyebrow: {
+    color: colors.primary,
+    fontSize: fontSize.xs,
+    fontWeight: '900',
+    letterSpacing: 0,
+    textTransform: 'uppercase',
+  },
+  sectionHeaderAction: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+  },
+  statusBadge: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+  },
+  statusBadgeIcon: {
+    fontSize: fontSize.xs,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.xs,
+  },
+  statusBadgeText: {
+    fontSize: fontSize.sm,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.sm,
+  },
+  statusBadgeSuccess: {
+    backgroundColor: colors.successSoft,
+    borderColor: colors.successBorder,
+  },
+  statusBadgeWarning: {
+    backgroundColor: colors.warningSoft,
+    borderColor: colors.warningBorder,
+  },
+  statusBadgeDanger: {
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.dangerBorder,
+  },
+  statusBadgeScheduled: {
+    backgroundColor: colors.scheduledSoft,
+    borderColor: colors.scheduledBorder,
+  },
+  statusBadgeInfo: {
+    backgroundColor: colors.infoSoft,
+    borderColor: '#c4dbe4',
+  },
+  statusBadgeNeutral: {
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.borderStrong,
+  },
+  statusBadgeTextSuccess: {
+    color: colors.success,
+  },
+  statusBadgeTextWarning: {
+    color: colors.warning,
+  },
+  statusBadgeTextDanger: {
+    color: colors.danger,
+  },
+  statusBadgeTextScheduled: {
+    color: colors.scheduled,
+  },
+  statusBadgeTextInfo: {
+    color: colors.info,
+  },
+  statusBadgeTextNeutral: {
+    color: colors.textMuted,
+  },
+  iconButton: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.medium,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xxs,
+    justifyContent: 'center',
+    minHeight: 40,
+    minWidth: 40,
+    paddingHorizontal: spacing.sm,
+  },
+  iconButtonSmall: {
+    minHeight: 34,
+    minWidth: 34,
+    paddingHorizontal: spacing.xs,
+  },
+  iconButtonPrimary: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  iconButtonDanger: {
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.dangerBorder,
+  },
+  iconButtonSelected: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  iconButtonText: {
+    color: colors.primary,
+    fontSize: fontSize.md,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.md,
+  },
+  iconButtonTextPrimary: {
+    color: colors.surface,
+  },
+  iconButtonTextDanger: {
+    color: colors.danger,
+  },
+  iconButtonLabel: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.sm,
+  },
+  emptyState: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radius.large,
+    borderWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.lg,
+  },
+  emptyStateIcon: {
+    color: colors.primary,
+    fontSize: fontSize.xl,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.xl,
+  },
+  emptyStateTitle: {
+    color: colors.text,
+    fontSize: fontSize.base,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.base,
+    textAlign: 'center',
+  },
+  emptyStateMessage: {
+    color: colors.textMuted,
+    fontSize: fontSize.md,
+    lineHeight: typography.lineHeight.md,
+    textAlign: 'center',
+  },
+  emptyStateAction: {
+    marginTop: spacing.xs,
+  },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: colors.primary,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     justifyContent: 'center',
     minHeight: 42,
     paddingHorizontal: spacing.lg,
@@ -105,7 +293,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceAlt,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 40,
@@ -131,7 +319,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 40,
@@ -168,7 +356,7 @@ export const styles = StyleSheet.create({
   noticeBox: {
     backgroundColor: colors.infoSoft,
     borderColor: '#c9dde5',
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     marginTop: spacing.md,
     padding: spacing.md,
@@ -236,6 +424,16 @@ export const styles = StyleSheet.create({
   todayTopStack: {
     gap: spacing.md,
   },
+  todayHeaderRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+  },
+  todayHeaderTextBlock: {
+    flex: 1,
+    gap: spacing.xs,
+  },
   dateCardHeader: {
     alignItems: 'flex-start',
     flexDirection: 'row',
@@ -268,7 +466,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceAlt,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
@@ -293,14 +491,83 @@ export const styles = StyleSheet.create({
   summaryPanel: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radius.card,
+    borderRadius: radius.large,
     borderWidth: 1,
     marginTop: spacing.md,
     padding: spacing.lg,
-    ...cardShadow,
   },
   summaryPanelHero: {
-    padding: spacing.xl,
+    gap: spacing.lg,
+  },
+  calorieHeroTopline: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+  },
+  calorieHeroValueBlock: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  summaryKicker: {
+    color: colors.primary,
+    fontSize: fontSize.sm,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.sm,
+  },
+  calorieHeroValue: {
+    color: colors.text,
+    fontSize: 38,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 44,
+  },
+  calorieHeroMeta: {
+    color: colors.textMuted,
+    fontSize: fontSize.base,
+    lineHeight: typography.lineHeight.base,
+  },
+  heroProgressTrack: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
+    height: 12,
+    overflow: 'hidden',
+  },
+  heroProgressFill: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    height: '100%',
+  },
+  calorieStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  calorieStatItem: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radius.medium,
+    borderWidth: 1,
+    flexGrow: 1,
+    minWidth: 128,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  calorieStatLabel: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.xs,
+  },
+  calorieStatValue: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.md,
+    marginTop: spacing.xxs,
+  },
+  summaryMacroList: {
+    gap: spacing.md,
   },
   summaryHeader: {
     alignItems: 'flex-start',
@@ -311,11 +578,10 @@ export const styles = StyleSheet.create({
   evaluationPanel: {
     backgroundColor: colors.surface,
     borderColor: '#d5e4e8',
-    borderRadius: radius.card,
+    borderRadius: radius.large,
     borderWidth: 1,
     marginTop: spacing.md,
     padding: spacing.lg,
-    ...cardShadow,
   },
   evaluationHeader: {
     alignItems: 'flex-start',
@@ -365,6 +631,44 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.md,
     lineHeight: 19,
   },
+  statusBanner: {
+    alignItems: 'flex-start',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.large,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  statusBannerTextBlock: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  statusBannerTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
+  statusBannerTitle: {
+    color: colors.text,
+    fontSize: fontSize.base,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.base,
+  },
+  statusBannerScore: {
+    color: colors.primary,
+    fontSize: fontSize.base,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.base,
+  },
+  statusBannerMessage: {
+    color: colors.textMuted,
+    fontSize: fontSize.md,
+    lineHeight: typography.lineHeight.md,
+  },
   sectionTitle: {
     color: colors.text,
     fontSize: fontSize.xl,
@@ -390,7 +694,7 @@ export const styles = StyleSheet.create({
   warningPanel: {
     backgroundColor: colors.warningSoft,
     borderColor: colors.warningBorder,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     marginTop: spacing.md,
     padding: spacing.md,
@@ -431,13 +735,13 @@ export const styles = StyleSheet.create({
   },
   progressTrack: {
     backgroundColor: '#e7ece2',
-    borderRadius: radius.sm,
+    borderRadius: radius.small,
     height: 9,
     overflow: 'hidden',
   },
   progressFill: {
     backgroundColor: colors.success,
-    borderRadius: radius.sm,
+    borderRadius: radius.small,
     height: '100%',
   },
   metricMetaRow: {
@@ -459,13 +763,13 @@ export const styles = StyleSheet.create({
   searchPanel: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radius.card,
+    borderRadius: radius.large,
     borderWidth: 1,
     maxHeight: '86%',
     maxWidth: 640,
     padding: spacing.lg,
     width: '100%',
-    ...cardShadow,
+    ...shadow.modal,
   },
   searchHeader: {
     alignItems: 'flex-start',
@@ -482,7 +786,7 @@ export const styles = StyleSheet.create({
   searchInput: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     color: colors.text,
     flex: 1,
@@ -509,7 +813,7 @@ export const styles = StyleSheet.create({
   searchResultCard: {
     backgroundColor: colors.surfaceMuted,
     borderColor: '#e2eadf',
-    borderRadius: radius.card,
+    borderRadius: radius.large,
     borderWidth: 1,
     padding: spacing.md,
   },
@@ -554,7 +858,7 @@ export const styles = StyleSheet.create({
   searchNutritionItem: {
     backgroundColor: colors.surface,
     borderColor: '#e5ede1',
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     flexGrow: 1,
     minWidth: 104,
@@ -573,16 +877,17 @@ export const styles = StyleSheet.create({
     marginTop: spacing.xxs,
   },
   mealStack: {
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  mealSection: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radius.card,
+    borderRadius: radius.large,
     borderWidth: 1,
+    marginTop: spacing.lg,
+    overflow: 'hidden',
+  },
+  mealSection: {
+    borderBottomColor: colors.divider,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     padding: spacing.lg,
-    ...cardShadow,
   },
   mealHeader: {
     alignItems: 'flex-start',
@@ -658,7 +963,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: '#8b9887',
-    borderRadius: radius.sm,
+    borderRadius: radius.small,
     borderWidth: 2,
     height: 25,
     justifyContent: 'center',
@@ -723,7 +1028,7 @@ export const styles = StyleSheet.create({
   },
   foodNutritionText: {
     backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.sm,
+    borderRadius: radius.small,
     color: colors.textMuted,
     fontSize: fontSize.sm,
     fontWeight: '800',
@@ -741,7 +1046,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceAlt,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 34,
@@ -759,7 +1064,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-end',
     backgroundColor: colors.primary,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     justifyContent: 'center',
     marginTop: spacing.md,
     minHeight: 38,
@@ -788,7 +1093,7 @@ export const styles = StyleSheet.create({
   openSearchButton: {
     alignItems: 'center',
     backgroundColor: colors.primary,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     height: 32,
     justifyContent: 'center',
     width: 32,
@@ -814,7 +1119,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceAlt,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 32,
@@ -833,7 +1138,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.dangerSoft,
     borderColor: colors.dangerBorder,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 32,
@@ -862,12 +1167,12 @@ export const styles = StyleSheet.create({
   portionModal: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radius.card,
+    borderRadius: radius.large,
     borderWidth: 1,
     maxWidth: 390,
     padding: spacing.lg,
     width: '100%',
-    ...cardShadow,
+    ...shadow.modal,
   },
   portionModalTitle: {
     color: colors.text,
@@ -896,7 +1201,7 @@ export const styles = StyleSheet.create({
   portionInput: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     color: colors.text,
     flex: 1,
@@ -920,7 +1225,7 @@ export const styles = StyleSheet.create({
   portionPreview: {
     backgroundColor: colors.surfaceMuted,
     borderColor: '#e5ede1',
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     gap: spacing.sm,
     marginTop: spacing.md,
@@ -961,7 +1266,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceAlt,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 40,
@@ -976,7 +1281,7 @@ export const styles = StyleSheet.create({
   portionConfirmButton: {
     alignItems: 'center',
     backgroundColor: colors.primary,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     justifyContent: 'center',
     minHeight: 40,
     minWidth: 72,
@@ -1021,7 +1326,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 40,
@@ -1067,7 +1372,7 @@ export const styles = StyleSheet.create({
   goalTextInput: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     color: colors.text,
     flex: 1,
@@ -1097,7 +1402,7 @@ export const styles = StyleSheet.create({
   activityOption: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -1149,7 +1454,7 @@ export const styles = StyleSheet.create({
   goalResultItem: {
     backgroundColor: colors.surfaceMuted,
     borderColor: '#e2eadf',
-    borderRadius: radius.card,
+    borderRadius: radius.large,
     borderWidth: 1,
     flexGrow: 1,
     minWidth: 126,
@@ -1178,7 +1483,7 @@ export const styles = StyleSheet.create({
   goalWarningText: {
     backgroundColor: colors.warningSoft,
     borderColor: colors.warningBorder,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     color: colors.warning,
     fontSize: fontSize.sm,
@@ -1189,7 +1494,7 @@ export const styles = StyleSheet.create({
   goalErrorText: {
     backgroundColor: colors.dangerSoft,
     borderColor: colors.dangerBorder,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     color: colors.danger,
     fontSize: fontSize.sm,
@@ -1201,7 +1506,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'stretch',
     backgroundColor: colors.primary,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     justifyContent: 'center',
     minHeight: 46,
     paddingHorizontal: spacing.lg,
@@ -1227,7 +1532,7 @@ export const styles = StyleSheet.create({
   settingsActionSlot: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     gap: spacing.xs,
     marginTop: spacing.md,
@@ -1247,7 +1552,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.secondarySoft,
     borderColor: '#b9d4de',
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 32,
@@ -1277,35 +1582,41 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
   },
+  calendarCard: {
+    padding: spacing.md,
+  },
   calendarMonthHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: spacing.md,
+    justifyContent: 'space-between',
+  },
+  calendarMonthTitleBlock: {
+    alignItems: 'center',
+    flex: 1,
+    gap: spacing.xxs,
   },
   calendarMonthTitle: {
     color: colors.text,
-    flex: 1,
     fontSize: fontSize.xl,
     fontWeight: '900',
     letterSpacing: 0,
+    lineHeight: typography.lineHeight.xl,
     textAlign: 'center',
   },
   calendarNavButton: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: 'center',
-    width: 44,
+    borderRadius: radius.pill,
+    height: 42,
+    minHeight: 42,
+    minWidth: 42,
+    paddingHorizontal: 0,
+    width: 42,
   },
   calendarNavButtonText: {
     color: colors.primary,
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '900',
-    lineHeight: 30,
+    lineHeight: 28,
   },
   calendarWeekHeader: {
     flexDirection: 'row',
@@ -1325,12 +1636,13 @@ export const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    rowGap: spacing.xs,
   },
   calendarDayCell: {
     alignItems: 'center',
-    aspectRatio: 0.88,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    aspectRatio: 0.92,
+    borderColor: 'transparent',
+    borderRadius: radius.medium,
     borderWidth: 1,
     justifyContent: 'space-between',
     minHeight: 58,
@@ -1339,12 +1651,11 @@ export const styles = StyleSheet.create({
     width: '14.285714%',
   },
   calendarDayCellOutside: {
-    backgroundColor: colors.surfaceMuted,
-    opacity: 0.58,
+    opacity: 0.45,
   },
   calendarDayCellToday: {
     borderColor: colors.primary,
-    borderWidth: 2,
+    borderWidth: 1,
   },
   calendarDayCellSelected: {
     backgroundColor: colors.primary,
@@ -1362,6 +1673,47 @@ export const styles = StyleSheet.create({
     color: colors.textSoft,
   },
   calendarDayNumberSelected: {
+    color: colors.surface,
+  },
+  calendarStatusRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xxs,
+    justifyContent: 'center',
+    maxWidth: '100%',
+  },
+  calendarStatusDot: {
+    borderRadius: radius.pill,
+    height: 6,
+    width: 6,
+  },
+  calendarStatusDotGood: {
+    backgroundColor: colors.success,
+  },
+  calendarStatusDotWarning: {
+    backgroundColor: colors.warning,
+  },
+  calendarStatusDotIncomplete: {
+    backgroundColor: colors.danger,
+  },
+  calendarStatusDotScheduled: {
+    backgroundColor: colors.scheduled,
+  },
+  calendarStatusDotEmpty: {
+    backgroundColor: colors.textSoft,
+  },
+  calendarStatusDotSelected: {
+    backgroundColor: colors.surface,
+  },
+  calendarStatusText: {
+    color: colors.textMuted,
+    flexShrink: 1,
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 12,
+    textAlign: 'center',
+  },
+  calendarStatusTextSelected: {
     color: colors.surface,
   },
   calendarStatusPill: {
@@ -1400,7 +1752,62 @@ export const styles = StyleSheet.create({
     color: colors.primary,
   },
   calendarSummaryCard: {
+    gap: spacing.lg,
     marginTop: spacing.md,
+  },
+  calendarSummaryTitleBlock: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  calendarSummaryTopGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  calendarSummaryMetric: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radius.medium,
+    borderWidth: 1,
+    flexGrow: 1,
+    minWidth: 132,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  calendarSummaryMetricLabel: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.xs,
+  },
+  calendarSummaryMetricValue: {
+    color: colors.text,
+    fontSize: fontSize.lg,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.lg,
+    marginTop: spacing.xxs,
+  },
+  calendarSummaryMetricMeta: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    lineHeight: typography.lineHeight.sm,
+    marginTop: spacing.xxs,
+  },
+  calendarCountRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  calendarCountPill: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.sm,
+    overflow: 'hidden',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
   },
   calendarCheckedCountText: {
     backgroundColor: colors.surfaceAlt,
@@ -1445,7 +1852,7 @@ export const styles = StyleSheet.create({
     alignItems: 'flex-start',
     backgroundColor: colors.surfaceMuted,
     borderColor: '#e2eadf',
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.md,
@@ -1493,6 +1900,48 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     color: colors.textMuted,
   },
+  iconButtonLabelPrimary: {
+    color: colors.surface,
+  },
+  iconButtonLabelDanger: {
+    color: colors.danger,
+  },
+  progressFillCalories: {
+    backgroundColor: colors.primary,
+  },
+  progressFillProtein: {
+    backgroundColor: colors.success,
+  },
+  progressFillCarbohydrate: {
+    backgroundColor: colors.secondary,
+  },
+  progressFillFat: {
+    backgroundColor: colors.warning,
+  },
+  mealTitleBlock: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  mealHeaderActions: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+    gap: spacing.xs,
+  },
+  foodKcalText: {
+    color: colors.text,
+    flexShrink: 0,
+    fontSize: fontSize.base,
+    fontWeight: '900',
+    lineHeight: typography.lineHeight.base,
+    textAlign: 'right',
+  },
+  calendarMonthSubtitle: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    lineHeight: typography.lineHeight.sm,
+    textAlign: 'center',
+  },
   fixedMealTemplateList: {
     gap: spacing.md,
     marginTop: spacing.md,
@@ -1500,7 +1949,7 @@ export const styles = StyleSheet.create({
   fixedMealTemplateRow: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.medium,
     borderWidth: 1,
     padding: spacing.md,
   },
