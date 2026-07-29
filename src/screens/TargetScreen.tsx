@@ -1,8 +1,17 @@
 import { useMemo, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 
+import {
+  Card,
+  NoticeBox,
+  PrimaryButton,
+  SectionHeader,
+  SelectButton,
+  StatusBadge,
+} from '../components/ui';
 import { colors } from '../constants';
-import type { DailyNutritionTargets } from '../nutrition';
+import type { DailyNutritionTargets, PrimaryNutritionField } from '../nutrition';
+import { nutritionLabels } from '../nutrition';
 import {
   activityLevelDescriptions,
   activityLevelLabels,
@@ -27,7 +36,6 @@ import {
   parseNumberInput,
   parseOptionalNumberInput,
 } from '../utils/format';
-import { Card, NoticeBox, PrimaryButton, SelectButton } from '../components/ui';
 
 const inBodyReportOptions: Array<{ description: string; label: string; value: boolean }> = [
   {
@@ -50,10 +58,24 @@ const activityLevelOptions: ActivityLevel[] = [
   'moderate',
   'veryActive',
 ];
+const goalMacroFields: PrimaryNutritionField[] = ['proteinG', 'carbohydrateG', 'fatG'];
 
 const goalCalculationModeLabels: Record<GoalCalculationMode, string> = {
   standard: '일반',
   inbody: '인바디',
+};
+
+const nutritionGoalDescriptions: Record<NutritionGoalType, string> = {
+  diet: '유지 칼로리보다 낮게 잡고 단백질을 높입니다.',
+  maintain: '현재 체중 유지를 기준으로 균형 있게 배분합니다.',
+  bulk: '유지 칼로리보다 높게 잡고 증량을 지원합니다.',
+};
+
+const goalMacroDescriptions: Record<PrimaryNutritionField, string> = {
+  caloriesKcal: '하루 목표 에너지',
+  proteinG: '체중 기반 권장량',
+  carbohydrateG: '남은 에너지 배분',
+  fatG: '목표 칼로리의 25%',
 };
 
 type GoalFormState = {
@@ -173,13 +195,12 @@ function GoalRecommendationPanel({
 }: GoalRecommendationPanelProps) {
   return (
     <View style={styles.goalPanel}>
-      <Card>
-        <View style={styles.summaryHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>기본 정보</Text>
-            <Text style={styles.sectionSubtitle}>목표 계산에 필요한 기본값</Text>
-          </View>
-        </View>
+      <Card style={styles.goalSectionCard}>
+        <SectionHeader
+          eyebrow="01"
+          subtitle="추천 계산의 기준이 되는 신체 정보입니다."
+          title="기본 정보"
+        />
 
         <View style={styles.goalFormGrid}>
           <GoalTextInput
@@ -210,6 +231,7 @@ function GoalRecommendationPanel({
           <View style={styles.segmentedControl}>
             {sexOptions.map((sex) => (
               <SelectButton
+                accessibilityLabel={`성별 ${sexLabels[sex]} 선택`}
                 key={sex}
                 label={sexLabels[sex]}
                 onPress={() => onChangeField('sex', sex)}
@@ -218,12 +240,22 @@ function GoalRecommendationPanel({
             ))}
           </View>
         </View>
+      </Card>
+
+      <Card style={styles.goalSectionCard}>
+        <SectionHeader
+          eyebrow="02"
+          subtitle="목표 방향과 평소 생활 활동량을 함께 반영합니다."
+          title="활동량과 목표"
+        />
 
         <View style={styles.goalChoiceSection}>
           <Text style={styles.goalFieldLabel}>목표</Text>
           <View style={styles.segmentedControl}>
             {nutritionGoalOptions.map((goal) => (
               <SelectButton
+                accessibilityLabel={`목표 ${nutritionGoalLabels[goal]} 선택`}
+                description={nutritionGoalDescriptions[goal]}
                 key={goal}
                 label={nutritionGoalLabels[goal]}
                 onPress={() => onChangeField('goal', goal)}
@@ -232,34 +264,46 @@ function GoalRecommendationPanel({
             ))}
           </View>
         </View>
-      </Card>
 
-      <Card>
-        <Text style={styles.sectionTitle}>활동량</Text>
-        <Text style={styles.sectionSubtitle}>
-          운동 시간이 아니라 평상시 운동 외 직업/생활 활동량 기준입니다.
-        </Text>
-        <View style={styles.activityList}>
-          {activityLevelOptions.map((activityLevel) => (
-            <SelectButton
-              description={activityLevelDescriptions[activityLevel]}
-              key={activityLevel}
-              label={activityLevelLabels[activityLevel]}
-              onPress={() => onChangeField('activityLevel', activityLevel)}
-              selected={form.activityLevel === activityLevel}
-            />
-          ))}
+        <View style={styles.goalChoiceSection}>
+          <Text style={styles.goalFieldLabel}>활동량</Text>
+          <Text style={styles.goalHelpText}>
+            운동 시간이 아니라 평상시 운동 외 직업/생활 활동량 기준입니다.
+          </Text>
+          <View style={styles.activityList}>
+            {activityLevelOptions.map((activityLevel) => (
+              <SelectButton
+                accessibilityLabel={`활동량 ${activityLevelLabels[activityLevel]} 선택`}
+                description={activityLevelDescriptions[activityLevel]}
+                key={activityLevel}
+                label={activityLevelLabels[activityLevel]}
+                onPress={() => onChangeField('activityLevel', activityLevel)}
+                selected={form.activityLevel === activityLevel}
+              />
+            ))}
+          </View>
         </View>
       </Card>
 
-      <Card>
-        <Text style={styles.sectionTitle}>인바디 입력</Text>
-        <Text style={styles.sectionSubtitle}>검사지가 있으면 BMR과 체성분을 추천 계산에 반영합니다.</Text>
+      <Card style={styles.goalSectionCard}>
+        <SectionHeader
+          action={(
+            <StatusBadge
+              label={form.hasInBodyReport ? '인바디 사용' : '일반 계산'}
+              tone={form.hasInBodyReport ? 'info' : 'neutral'}
+            />
+          )}
+          eyebrow="03"
+          subtitle="검사지가 있으면 BMR과 체성분을 추천 계산에 반영합니다."
+          title="인바디"
+        />
+
         <View style={styles.goalQuestionBlock}>
           <Text style={styles.goalQuestionText}>인바디 검사지가 있나요?</Text>
           <View style={styles.segmentedControl}>
             {inBodyReportOptions.map((option) => (
               <SelectButton
+                accessibilityLabel={`${option.label} 선택`}
                 description={option.description}
                 key={option.label}
                 label={option.label}
@@ -325,6 +369,7 @@ function GoalRecommendationPanel({
       </Card>
 
       <GoalRecommendationResult
+        goal={form.goal}
         onApplyTargets={onApplyTargets}
         recommendation={recommendation}
       />
@@ -354,6 +399,7 @@ function GoalTextInput({
       <Text style={styles.goalFieldLabel}>{label}</Text>
       <View style={styles.goalInputRow}>
         <TextInput
+          accessibilityLabel={`${label}${unit ? ` ${unit}` : ''} 입력`}
           keyboardType={keyboardType}
           onChangeText={onChangeText}
           placeholder={placeholder ?? label}
@@ -368,18 +414,24 @@ function GoalTextInput({
 }
 
 type GoalRecommendationResultProps = {
+  goal: NutritionGoalType;
   onApplyTargets: () => void;
   recommendation: NutritionGoalRecommendation;
 };
 
 function GoalRecommendationResult({
+  goal,
   onApplyTargets,
   recommendation,
 }: GoalRecommendationResultProps) {
   if (!recommendation.ok) {
     return (
-      <Card>
-        <Text style={styles.sectionTitle}>추천 결과</Text>
+      <Card style={styles.goalResultCard}>
+        <SectionHeader
+          eyebrow="04"
+          subtitle="입력값을 확인하면 추천 목표가 표시됩니다."
+          title="추천 결과"
+        />
         <View style={styles.goalResultSection}>
           {recommendation.errors.map((error) => (
             <NoticeBox
@@ -397,42 +449,66 @@ function GoalRecommendationResult({
     );
   }
 
-  const resultRows: Array<{ label: string; value: string }> = [
-    { label: '계산 모드', value: goalCalculationModeLabels[recommendation.mode] },
-    { label: '선택된 BMR', value: formatKcalValue(recommendation.selectedBmrKcal) },
-    { label: 'Mifflin BMR', value: formatKcalValue(recommendation.mifflinBmrKcal) },
-    { label: 'TDEE', value: formatKcalValue(recommendation.tdeeKcal) },
-    { label: 'BMI', value: formatBmiValue(recommendation.bmi) },
-    { label: 'BMI 분류', value: bmiCategoryLabels[recommendation.bmiCategory] },
-    { label: '목표 칼로리', value: formatKcalValue(recommendation.targets.caloriesKcal ?? 0) },
-    { label: '목표 단백질', value: formatGramValue(recommendation.targets.proteinG ?? 0) },
-    { label: '목표 탄수화물', value: formatGramValue(recommendation.targets.carbohydrateG ?? 0) },
-    { label: '목표 지방', value: formatGramValue(recommendation.targets.fatG ?? 0) },
-  ];
-
-  if (recommendation.inBodyBmrKcal !== null) {
-    resultRows.splice(3, 0, {
-      label: '인바디 BMR',
-      value: formatKcalValue(recommendation.inBodyBmrKcal),
-    });
-  }
-
   return (
-    <Card>
-      <View style={styles.summaryHeader}>
-        <View>
-          <Text style={styles.sectionTitle}>추천 결과</Text>
-          <Text style={styles.sectionSubtitle}>BMR, TDEE와 목표 영양성분</Text>
-        </View>
-      </View>
+    <Card elevated style={styles.goalResultCard}>
+      <SectionHeader
+        action={<StatusBadge label={goalCalculationModeLabels[recommendation.mode]} tone="info" />}
+        eyebrow="04"
+        subtitle="추천 목표와 계산 기준을 확인한 뒤 적용합니다."
+        title="추천 결과"
+      />
+
       <View style={styles.goalResultSection}>
-        <View style={styles.goalResultGrid}>
-          {resultRows.map((row) => (
-            <View key={row.label} style={styles.goalResultItem}>
-              <Text style={styles.goalResultLabel}>{row.label}</Text>
-              <Text style={styles.goalResultValue}>{row.value}</Text>
+        <View style={styles.goalCalorieHero}>
+          <Text style={styles.goalCalorieLabel}>추천 칼로리</Text>
+          <Text style={styles.goalCalorieValue}>
+            {formatKcalValue(recommendation.targets.caloriesKcal ?? 0)}
+          </Text>
+          <Text style={styles.goalCalorieMeta}>
+            {nutritionGoalLabels[goal]} 목표 기준
+          </Text>
+        </View>
+
+        <View style={styles.goalMacroGrid}>
+          {goalMacroFields.map((field) => (
+            <View key={field} style={styles.goalMacroItem}>
+              <Text style={styles.goalMacroLabel}>{nutritionLabels[field]}</Text>
+              <Text style={styles.goalMacroValue}>
+                {formatGramValue(recommendation.targets[field] ?? 0)}
+              </Text>
+              <Text style={styles.goalMacroMeta}>{goalMacroDescriptions[field]}</Text>
             </View>
           ))}
+        </View>
+
+        <View style={styles.goalMetabolismGrid}>
+          <GoalMetricCard
+            description="추천 계산에 실제 사용한 기초대사량입니다."
+            label="선택된 BMR"
+            value={formatKcalValue(recommendation.selectedBmrKcal)}
+          />
+          <GoalMetricCard
+            description="신장, 체중, 나이, 성별로 추정한 기초대사량입니다."
+            label="Mifflin BMR"
+            value={formatKcalValue(recommendation.mifflinBmrKcal)}
+          />
+          {recommendation.inBodyBmrKcal !== null ? (
+            <GoalMetricCard
+              description="인바디 검사지에 기록된 기초대사량입니다."
+              label="인바디 BMR"
+              value={formatKcalValue(recommendation.inBodyBmrKcal)}
+            />
+          ) : null}
+          <GoalMetricCard
+            description="BMR에 생활 활동량을 반영한 하루 예상 소비 칼로리입니다."
+            label="TDEE"
+            value={formatKcalValue(recommendation.tdeeKcal)}
+          />
+          <GoalMetricCard
+            description={bmiCategoryLabels[recommendation.bmiCategory]}
+            label="BMI"
+            value={formatBmiValue(recommendation.bmi)}
+          />
         </View>
 
         <Text style={styles.goalDisclaimerText}>
@@ -456,12 +532,29 @@ function GoalRecommendationResult({
         </View>
 
         <PrimaryButton
-          label="목표 적용"
+          accessibilityLabel="추천 목표 적용"
+          label="추천 목표 적용"
           onPress={onApplyTargets}
           style={styles.applyGoalButton}
           textStyle={styles.applyGoalButtonText}
         />
       </View>
     </Card>
+  );
+}
+
+type GoalMetricCardProps = {
+  description: string;
+  label: string;
+  value: string;
+};
+
+function GoalMetricCard({ description, label, value }: GoalMetricCardProps) {
+  return (
+    <View style={styles.goalMetricCard}>
+      <Text style={styles.goalMetricLabel}>{label}</Text>
+      <Text style={styles.goalMetricValue}>{value}</Text>
+      <Text style={styles.goalMetricDescription}>{description}</Text>
+    </View>
   );
 }

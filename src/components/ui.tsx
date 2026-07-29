@@ -329,6 +329,7 @@ export function BottomTabItem({ icon, label, onPress, selected, style }: BottomT
 }
 
 type SelectButtonProps = {
+  accessibilityLabel?: string;
   description?: string;
   label: string;
   onPress: () => void;
@@ -337,6 +338,7 @@ type SelectButtonProps = {
 };
 
 export function SelectButton({
+  accessibilityLabel,
   description,
   label,
   onPress,
@@ -345,6 +347,7 @@ export function SelectButton({
 }: SelectButtonProps) {
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
