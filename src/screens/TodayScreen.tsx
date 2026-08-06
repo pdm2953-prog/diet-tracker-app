@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
@@ -28,10 +28,15 @@ import {
 } from '../nutrition';
 import type { DailyNutritionTargets } from '../nutrition';
 import {
+  defaultFoodSearchProvider,
   FOOD_SEARCH_RESULT_LIMIT,
-  mockFoodSearchProvider,
+  isValidFoodSearchQuery,
 } from '../services/foodSearch';
 import type { FoodSearchResult } from '../services/foodSearch';
+import {
+  createFoodSearchRequestGate,
+  scheduleFoodSearchRequest,
+} from '../services/foodSearchRequest';
 import { styles } from '../styles';
 import { shouldEvaluateMealDate } from '../mealDatePolicy';
 import {
@@ -85,6 +90,7 @@ export function TodayScreen({
   const [activeSearchMealType, setActiveSearchMealType] = useState<MealType | null>(null);
   const [portionModal, setPortionModal] = useState<FoodPortionModalState | null>(null);
   const [portionGramsInput, setPortionGramsInput] = useState('');
+  const foodSearchRequestGate = useRef(createFoodSearchRequestGate()).current;
   const foodsById = useMemo<Record<string, Food>>(
     () =>
       Object.fromEntries(
@@ -169,7 +175,8 @@ export function TodayScreen({
   useEffect(() => {
     const query = searchQuery.trim();
 
-    if (activeSearchMealType === null || query.length === 0) {
+    if (activeSearchMealType === null || !isValidFoodSearchQuery(query)) {
+      foodSearchRequestGate.cancel();
       setHasSearched(false);
       setIsSearching(false);
       setSearchError(null);
@@ -177,35 +184,31 @@ export function TodayScreen({
       return;
     }
 
-    let isCurrent = true;
-
-    setHasSearched(true);
-    setIsSearching(true);
-    setSearchError(null);
-
-    mockFoodSearchProvider
-      .searchFoods(query, { limit: FOOD_SEARCH_RESULT_LIMIT })
-      .then((results) => {
-        if (isCurrent) {
-          setSearchResults(results);
-        }
-      })
-      .catch(() => {
-        if (isCurrent) {
-          setSearchError('검색 중 오류가 발생했습니다.');
+    return scheduleFoodSearchRequest({
+      callbacks: {
+        onStart: () => {
+          setHasSearched(true);
+          setIsSearching(true);
+          setSearchError(null);
           setSearchResults([]);
-        }
-      })
-      .finally(() => {
-        if (isCurrent) {
+        },
+        onSuccess: (results) => {
+          setSearchResults(results);
+        },
+        onError: (message) => {
+          setSearchError(message);
+          setSearchResults([]);
+        },
+        onFinish: () => {
           setIsSearching(false);
-        }
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [activeSearchMealType, searchQuery]);
+        },
+      },
+      gate: foodSearchRequestGate,
+      options: { limit: FOOD_SEARCH_RESULT_LIMIT },
+      provider: defaultFoodSearchProvider,
+      query,
+    });
+  }, [activeSearchMealType, foodSearchRequestGate, searchQuery]);
 
   const addFoodToMeal = (
     food: FoodSearchResult,

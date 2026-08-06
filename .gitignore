@@ -31,7 +31,14 @@ yarn-error.*
 *.pem
 
 # local env files
-.env*.local
+.env
+.env.local
+.env.*
+!.env.example
+backend/.env
+backend/.env.local
+backend/.env.*
+!backend/.env.example
 
 # typescript
 *.tsbuildinfo
@@ -42,3 +49,12 @@ yarn-error.*
 
 # Codex harness generated context
 .codex-harness/
+
+# Python backend
+backend/.venv/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/*.egg-info/
+backend/**/*.egg-info/
+backend/.pytest_cache/
