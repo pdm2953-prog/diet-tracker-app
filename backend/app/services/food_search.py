@@ -43,12 +43,13 @@ class FoodSearchService:
         page_size: int,
     ) -> FoodSearchServiceResponse:
         query_resolution = self._resolve_query(query)
+        normalized_page_size = self._normalize_provider_page_size(page_size)
 
         if query_resolution.status == "unresolved":
             return FoodSearchServiceResponse(
                 items=[],
                 page=page,
-                page_size=self._normalize_short_circuit_page_size(page_size),
+                page_size=normalized_page_size,
                 has_more=False,
                 query=query_resolution,
             )
@@ -56,7 +57,7 @@ class FoodSearchService:
         provider_response = await self._provider.search_foods(
             query_resolution.resolved,
             page,
-            page_size,
+            normalized_page_size,
         )
 
         return FoodSearchServiceResponse(
@@ -94,7 +95,7 @@ class FoodSearchService:
             target_language=localization.language,
         )
 
-    def _normalize_short_circuit_page_size(self, page_size: int) -> int:
+    def _normalize_provider_page_size(self, page_size: int) -> int:
         max_page_size = self._provider.search_localization.max_page_size
 
         if max_page_size is None:

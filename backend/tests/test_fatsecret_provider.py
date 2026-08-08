@@ -452,7 +452,7 @@ def test_basic_search_caps_page_size_to_configured_max_results() -> None:
             return token_response()
 
         api_requests.append(request)
-        return httpx.Response(200, json=basic_search_payload(None, total_results="0"))
+        return httpx.Response(200, json=basic_search_payload(None, total_results="20"))
 
     async def scenario():
         provider = make_provider(
@@ -464,11 +464,12 @@ def test_basic_search_caps_page_size_to_configured_max_results() -> None:
                 basic_max_results=10,
             ),
         )
-        return await provider.search_foods("chicken", 1, 11)
+        return await provider.search_foods("chicken", 1, 20)
 
     result = run(scenario())
 
     assert result.page_size == 10
+    assert result.has_more is True
     assert request_params(api_requests[0])["max_results"] == "10"
 
 
@@ -616,6 +617,26 @@ def test_premier_search_request_includes_region_language_zero_based_page_and_max
     assert params["max_results"] == "50"
     assert params["format"] == "json"
     assert params["flag_default_serving"] == "true"
+
+
+def test_premier_search_keeps_requested_page_size_within_limit() -> None:
+    api_requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "oauth.fatsecret.com":
+            return token_response()
+
+        api_requests.append(request)
+        return httpx.Response(200, json=premier_search_payload(None, total_results="0"))
+
+    async def scenario():
+        provider = make_provider(handler)
+        return await provider.search_foods("chicken", 1, 20)
+
+    result = run(scenario())
+
+    assert result.page_size == 20
+    assert request_params(api_requests[0])["max_results"] == "20"
 
 
 def test_selects_exact_100g_serving_before_default_serving() -> None:

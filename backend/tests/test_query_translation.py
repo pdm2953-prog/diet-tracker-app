@@ -20,6 +20,7 @@ class RecordingFoodProvider:
     def __init__(self, localization: FoodSearchProviderLocalization) -> None:
         self._localization = localization
         self.search_queries: list[str] = []
+        self.search_page_sizes: list[int] = []
 
     @property
     def provider_name(self) -> ProviderName:
@@ -36,6 +37,7 @@ class RecordingFoodProvider:
         page_size: int,
     ) -> FoodSearchProviderResponse:
         self.search_queries.append(query)
+        self.search_page_sizes.append(page_size)
 
         return FoodSearchProviderResponse(
             items=[make_fatsecret_record()],
@@ -106,6 +108,8 @@ def test_fatsecret_basic_searches_with_translated_alias_and_keeps_food_payload()
     result = run(service.search_foods("닭가슴살", 1, 20))
 
     assert provider.search_queries == ["chicken breast"]
+    assert provider.search_page_sizes == [10]
+    assert result.page_size == 10
     assert result.query is not None
     assert result.query.original == "닭가슴살"
     assert result.query.resolved == "chicken breast"
@@ -124,6 +128,8 @@ def test_fatsecret_premier_kr_ko_searches_with_original_korean_query() -> None:
     result = run(service.search_foods("닭가슴살", 1, 20))
 
     assert provider.search_queries == ["닭가슴살"]
+    assert provider.search_page_sizes == [20]
+    assert result.page_size == 20
     assert result.query is None
 
 

@@ -47,6 +47,7 @@ const backendConfig: BackendServiceConfig = {
 const backendFoodDto = {
   id: 'mock-chicken-breast',
   name: '닭가슴살',
+  displayName: '닭가슴살',
   brandName: null,
   sourceFoodName: '닭가슴살',
   servingSize: 100,
@@ -89,6 +90,7 @@ test('adaptBackendFoodSearchItem maps backend DTO to Food and preserves zero val
   assert.equal(food.source, 'backend-food-search');
   assert.equal(food.sourceFoodId, 'mock-chicken-breast');
   assert.equal(food.sourceFoodName, '닭가슴살');
+  assert.equal(food.displayName, '닭가슴살');
   assert.equal(food.brandName, null);
   assert.equal(food.category, null);
   assert.equal(food.nutritionPerServing.carbohydrateG, 0);
@@ -100,22 +102,34 @@ test('adaptBackendFoodSearchItem safely maps optional FatSecret metadata', () =>
     ...backendFoodDto,
     dataSource: 'fatsecret',
     id: 'fatsecret-123-456',
+    name: 'Chicken Breast',
+    displayName: '닭가슴살',
     sourceFoodId: '123',
     sourceFoodName: 'Chicken Breast',
     sourceServingId: '456',
     servingDescription: '100 g',
     sourceRegion: 'KR',
+    wasLocalized: true,
+    displayLocale: 'ko-KR',
+    localizer: 'korean_food_name',
   }, {
     updatedAt: '2026-07-30T00:00:00.000Z',
   });
 
   assert.equal(food.id, 'fatsecret-123-456');
   assert.equal(food.sourceFoodId, '123');
+  assert.equal(food.name, 'Chicken Breast');
   assert.equal(food.sourceFoodName, 'Chicken Breast');
+  assert.equal(food.displayName, '닭가슴살');
   assert.equal(food.dataSource, 'fatsecret');
   assert.equal(food.sourceServingId, '456');
   assert.equal(food.servingDescription, '100 g');
   assert.equal(food.sourceRegion, 'KR');
+  assert.equal(food.wasLocalized, true);
+  assert.equal(food.displayLocale, 'ko-KR');
+  assert.equal(food.localizer, 'korean_food_name');
+  assert.equal(food.servingSize, 100);
+  assert.equal(food.servingUnit, 'g');
   assert.equal(food.nutritionPerServing.carbohydrateG, 0);
 });
 
@@ -213,6 +227,69 @@ test('defaultFoodSearchProvider uses backend by default instead of matching fron
     restoreEnvValue('EXPO_PUBLIC_BACKEND_URL', previousBackendUrl);
     restoreEnvValue('EXPO_PUBLIC_FOOD_SEARCH_PROVIDER', previousFoodSearchProvider);
     globalThis.fetch = previousFetch;
+  }
+});
+
+test('searchBackendFoods sends requested provider-neutral pageSize unchanged', async () => {
+  let requestedUrl: string | null = null;
+  const result = await searchBackendFoods('닭가슴살', {
+    config: backendConfig,
+    pageSize: 20,
+    fetch: async (input) => {
+      requestedUrl = String(input);
+
+      return new Response(JSON.stringify({
+        items: [],
+        page: 1,
+        pageSize: 10,
+        hasMore: false,
+      }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(requestedUrl !== null, true);
+
+  if (requestedUrl !== null) {
+    const url = new URL(requestedUrl);
+
+    assert.equal(url.searchParams.get('pageSize'), '20');
+  }
+
+  if (result.ok) {
+    assert.equal(result.pageSize, 10);
+  }
+});
+
+test('searchBackendFoods defaults to provider-neutral pageSize 20', async () => {
+  let requestedUrl: string | null = null;
+  const result = await searchBackendFoods('닭가슴살', {
+    config: backendConfig,
+    fetch: async (input) => {
+      requestedUrl = String(input);
+
+      return new Response(JSON.stringify({
+        items: [],
+        page: 1,
+        pageSize: 20,
+        hasMore: false,
+      }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(requestedUrl !== null, true);
+
+  if (requestedUrl !== null) {
+    const url = new URL(requestedUrl);
+
+    assert.equal(url.searchParams.get('pageSize'), '20');
   }
 });
 

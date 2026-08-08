@@ -11,6 +11,11 @@ import {
 import type { FoodSearchResult } from '../services/foodSearch';
 import { styles } from '../styles';
 import { formatServingText } from '../utils/format';
+import {
+  getDevelopmentSourceFoodName,
+  getFoodDisplayName,
+  isDevelopmentMode,
+} from '../utils/foodDisplay';
 import { getMissingPrimaryFields } from '../utils/nutritionUi';
 import { EmptyState, NoticeBox, PrimaryButton, SecondaryButton, StatusBadge } from './ui';
 
@@ -153,13 +158,15 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
   const canAddFood = hasValidGramServing(food);
   const macroFields = primaryNutritionFields.filter((field) => field !== 'caloriesKcal');
   const dataSourceLabel = formatDataSourceLabel(food.dataSource);
+  const foodDisplayName = getFoodDisplayName(food);
+  const sourceFoodName = getDevelopmentSourceFoodName(food);
 
   return (
     <View style={styles.searchResultCard}>
       <View style={styles.searchResultHeader}>
         <View style={styles.searchResultTitleBlock}>
           <View style={styles.searchResultStatusRow}>
-            <Text style={styles.searchResultName}>{food.name}</Text>
+            <Text style={styles.searchResultName}>{foodDisplayName}</Text>
             {shouldShowDataSourceBadge(food.dataSource) && dataSourceLabel !== null ? (
               <StatusBadge icon="i" label={dataSourceLabel} tone="info" />
             ) : null}
@@ -169,6 +176,9 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
               <StatusBadge label="일부 정보 없음" tone="warning" />
             ) : null}
           </View>
+          {sourceFoodName !== null ? (
+            <Text style={styles.searchResultSourceName}>{sourceFoodName}</Text>
+          ) : null}
           <View style={styles.searchResultMetaRow}>
             <Text style={styles.searchResultMetaPill}>{food.category ?? '분류 없음'}</Text>
             <Text style={styles.searchResultMetaPill}>기준 {formatServingText(food)}</Text>
@@ -202,7 +212,7 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
       </View>
 
       <PrimaryButton
-        accessibilityLabel={canAddFood ? `${food.name} 섭취량 입력` : `${food.name} 추가 불가`}
+        accessibilityLabel={canAddFood ? `${foodDisplayName} 섭취량 입력` : `${foodDisplayName} 추가 불가`}
         disabled={!canAddFood}
         label={canAddFood ? '섭취량 입력' : '추가 불가'}
         onPress={() => onSelectFood(food)}
@@ -236,11 +246,6 @@ function shouldShowDataSourceBadge(dataSource: FoodDataSource | undefined): bool
   return isDevelopmentMode() && dataSource !== undefined;
 }
 
-function isDevelopmentMode(): boolean {
-  const globalValue = globalThis as typeof globalThis & { __DEV__?: boolean };
-
-  return globalValue.__DEV__ === true;
-}
 
 function formatDataSourceLabel(dataSource: FoodDataSource | undefined): string | null {
   if (dataSource === 'mock') {

@@ -8,6 +8,8 @@ import { createBackendServiceConfig } from './backendConfig';
 import { createAbortError, isAbortError } from './abortError';
 import type { FoodSearchOptions, FoodSearchProvider, FoodSearchProviderResponse } from './foodSearch';
 
+export const DEFAULT_BACKEND_FOOD_SEARCH_PAGE_SIZE = 20;
+
 export type BackendFoodSearchErrorCode =
   | 'http-error'
   | 'invalid-response'
@@ -71,7 +73,7 @@ export async function searchBackendFoods(
 
   const requestUrl = buildFoodSearchUrl(baseUrl, {
     page: options.page ?? 1,
-    pageSize: options.pageSize ?? 20,
+    pageSize: options.pageSize ?? DEFAULT_BACKEND_FOOD_SEARCH_PAGE_SIZE,
     query,
   });
   const externalSignal = options.signal;

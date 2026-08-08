@@ -409,10 +409,14 @@ function parseFood(value: unknown): Food | null {
     : parseFiniteNumber(value.servingSize);
   const nutritionPerServing = parseNutrition(value.nutritionPerServing);
   const dataSource = parseOptionalFoodDataSource(value.dataSource);
+  const displayName = parseOptionalString(value.displayName);
   const sourceFoodName = parseOptionalString(value.sourceFoodName);
   const sourceServingId = parseOptionalString(value.sourceServingId);
   const servingDescription = parseOptionalString(value.servingDescription);
   const sourceRegion = parseOptionalString(value.sourceRegion);
+  const wasLocalized = parseOptionalBoolean(value.wasLocalized);
+  const displayLocale = parseOptionalString(value.displayLocale);
+  const localizer = parseOptionalString(value.localizer);
 
   if (
     !isNonEmptyString(value.id)
@@ -426,6 +430,10 @@ function parseFood(value: unknown): Food | null {
     || nutritionPerServing === null
     || !isNonEmptyString(value.updatedAt)
     || dataSource === null
+    || displayName === null
+    || wasLocalized === null
+    || displayLocale === null
+    || localizer === null
   ) {
     return null;
   }
@@ -435,6 +443,7 @@ function parseFood(value: unknown): Food | null {
     source: value.source,
     sourceFoodId: value.sourceFoodId,
     name: value.name,
+    ...(displayName !== undefined ? { displayName } : {}),
     brandName: value.brandName,
     category: value.category,
     servingSize,
@@ -446,6 +455,9 @@ function parseFood(value: unknown): Food | null {
     ...(sourceServingId !== undefined ? { sourceServingId } : {}),
     ...(servingDescription !== undefined ? { servingDescription } : {}),
     ...(sourceRegion !== undefined ? { sourceRegion } : {}),
+    ...(wasLocalized !== undefined ? { wasLocalized } : {}),
+    ...(displayLocale !== undefined ? { displayLocale } : {}),
+    ...(localizer !== undefined ? { localizer } : {}),
   };
 }
 
@@ -488,6 +500,16 @@ function parseFiniteNumber(value: unknown): number | null {
 
 function parseOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function parseOptionalBoolean(value: unknown): boolean | null | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  return typeof value === 'boolean'
+    ? value
+    : null;
 }
 
 function parseOptionalFoodDataSource(value: unknown): Food['dataSource'] | null | undefined {

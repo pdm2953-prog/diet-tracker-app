@@ -29,7 +29,7 @@ import {
 import type { DailyNutritionTargets } from '../nutrition';
 import {
   defaultFoodSearchProvider,
-  FOOD_SEARCH_RESULT_LIMIT,
+  getDefaultFoodSearchResultLimit,
   isValidFoodSearchQuery,
 } from '../services/foodSearch';
 import type { FoodSearchResult } from '../services/foodSearch';
@@ -210,7 +210,7 @@ export function TodayScreen({
         },
       },
       gate: foodSearchRequestGate,
-      options: { limit: FOOD_SEARCH_RESULT_LIMIT },
+      options: { limit: getDefaultFoodSearchResultLimit() },
       provider: defaultFoodSearchProvider,
       query,
     });

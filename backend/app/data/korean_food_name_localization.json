@@ -1,0 +1,44 @@
+{
+  "displayLocale": "ko-KR",
+  "exactPhrases": {
+    "chicken breast": "닭가슴살",
+    "grilled chicken breast": "구운 닭가슴살",
+    "roasted chicken breast": "구운 닭가슴살",
+    "boiled chicken breast": "삶은 닭가슴살",
+    "skinless chicken breast": "껍질 제거 닭가슴살",
+    "boneless chicken breast": "뼈 제거 닭가슴살",
+    "boneless skinless chicken breast": "뼈·껍질 제거 닭가슴살",
+    "chicken breast with skin": "껍질 포함 닭가슴살",
+    "egg": "계란",
+    "boiled egg": "삶은 계란",
+    "sweet potato": "고구마",
+    "brown rice": "현미밥",
+    "white rice": "흰쌀밥",
+    "salmon": "연어",
+    "tuna": "참치",
+    "tofu": "두부",
+    "oatmeal": "오트밀"
+  },
+  "foods": {
+    "chicken breast": "닭가슴살",
+    "egg": "계란",
+    "sweet potato": "고구마",
+    "brown rice": "현미밥",
+    "white rice": "흰쌀밥",
+    "salmon": "연어",
+    "tuna": "참치",
+    "tofu": "두부",
+    "oatmeal": "오트밀"
+  },
+  "modifiers": {
+    "grilled": "구운",
+    "roasted": "구운",
+    "boiled": "삶은",
+    "fried": "튀긴",
+    "raw": "생",
+    "cooked": "조리된",
+    "skinless": "껍질 제거",
+    "boneless": "뼈 제거",
+    "with skin": "껍질 포함"
+  }
+}

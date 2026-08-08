@@ -839,6 +839,12 @@ export const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: typography.lineHeight.lg,
   },
+  searchResultSourceName: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    lineHeight: typography.lineHeight.sm,
+  },
   searchResultMeta: {
     color: colors.textMuted,
     fontSize: fontSize.sm,
@@ -1012,6 +1018,12 @@ export const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: fontSize.lg,
     fontWeight: '900',
+  },
+  foodSourceName: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    lineHeight: typography.lineHeight.sm,
   },
   foodGramsBadge: {
     backgroundColor: colors.primarySoft,
@@ -1193,6 +1205,12 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontWeight: '900',
     marginTop: spacing.sm,
+  },
+  portionSourceFoodName: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    lineHeight: typography.lineHeight.sm,
   },
   portionServingText: {
     color: colors.textMuted,

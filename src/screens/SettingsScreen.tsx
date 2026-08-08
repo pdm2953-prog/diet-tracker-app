@@ -16,6 +16,7 @@ import type { FixedMealTemplate, Food, MealType } from '../models';
 import { formatNutritionValue } from '../nutrition';
 import { styles } from '../styles';
 import { formatAmountLabel } from '../utils/format';
+import { getFoodDisplayName } from '../utils/foodDisplay';
 
 type SettingsScreenProps = {
   fixedMealTemplates: FixedMealTemplate[];
@@ -279,7 +280,7 @@ function FixedMealTemplateRow({
 
           return (
             <View key={item.id} style={styles.fixedMealTemplateFoodRow}>
-              <Text style={styles.fixedMealTemplateFoodName}>{food.name}</Text>
+              <Text style={styles.fixedMealTemplateFoodName}>{getFoodDisplayName(food)}</Text>
               <Text style={styles.fixedMealTemplateFoodMeta}>
                 {formatAmountLabel(item.consumedGrams)}g · {formatNutritionValue('caloriesKcal', item.calculatedNutrition.caloriesKcal)}
               </Text>

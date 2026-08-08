@@ -43,6 +43,7 @@ import {
   shiftCalendarMonth,
 } from '../utils/date';
 import { formatAmountLabel, formatDateLabel } from '../utils/format';
+import { getFoodDisplayName } from '../utils/foodDisplay';
 
 const weekDayLabels = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -395,7 +396,7 @@ function MealFoodSummaryRow({ fixed, food, mealFood }: MealFoodSummaryRowProps) 
     <View style={styles.calendarFoodSummaryRow}>
       <View style={styles.calendarFoodTitleBlock}>
         <View style={styles.calendarFoodNameRow}>
-          <Text style={styles.calendarFoodName}>{food?.name ?? '알 수 없는 음식'}</Text>
+          <Text style={styles.calendarFoodName}>{food === undefined ? '알 수 없는 음식' : getFoodDisplayName(food)}</Text>
           {fixed ? <Text style={styles.fixedMealBadge}>고정 식단</Text> : null}
         </View>
         <Text style={styles.calendarFoodMeta}>

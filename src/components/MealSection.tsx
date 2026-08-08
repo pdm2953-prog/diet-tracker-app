@@ -15,6 +15,7 @@ import {
 } from '../nutrition';
 import { styles } from '../styles';
 import { formatAmountLabel, formatServingText } from '../utils/format';
+import { getDevelopmentSourceFoodName, getFoodDisplayName } from '../utils/foodDisplay';
 import { isPrimaryNutritionField } from '../utils/nutritionUi';
 import { EmptyState, IconButton, StatusBadge } from './ui';
 
@@ -137,7 +138,8 @@ function FoodRow({
     (field) => mealFood.calculatedNutrition[field] === null,
   );
   const fixedMealFood = isFixedMealFood(mealFood);
-  const foodName = food?.name ?? '알 수 없는 음식';
+  const foodName = food === undefined ? '알 수 없는 음식' : getFoodDisplayName(food);
+  const sourceFoodName = food === undefined ? null : getDevelopmentSourceFoodName(food);
   const calories = formatNutritionValue('caloriesKcal', totalNutrition.caloriesKcal);
   const handleDecrease = (event: GestureResponderEvent) => {
     event.stopPropagation();
@@ -181,6 +183,9 @@ function FoodRow({
                 <Text style={styles.fixedMealBadge}>고정 식단</Text>
               ) : null}
             </View>
+            {sourceFoodName !== null ? (
+              <Text style={styles.foodSourceName}>{sourceFoodName}</Text>
+            ) : null}
             <Text style={styles.foodMeta}>
               {formatAmountLabel(consumedGrams)}g · {food?.category ?? '분류 없음'} · 기준 {food ? formatServingText(food) : '정보 없음'}
             </Text>

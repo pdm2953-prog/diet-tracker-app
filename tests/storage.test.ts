@@ -24,6 +24,7 @@ const food: Food = {
   sourceFoodId: 'food-storage',
   sourceFoodName: 'Storage Food Source',
   name: 'storage food',
+  displayName: '저장 표시명',
   brandName: null,
   category: null,
   servingSize: 100,
@@ -34,6 +35,9 @@ const food: Food = {
   sourceServingId: 'serving-storage',
   servingDescription: '100 g',
   sourceRegion: 'KR',
+  wasLocalized: true,
+  displayLocale: 'ko-KR',
+  localizer: 'korean_food_name',
 };
 
 const meal: Meal = {

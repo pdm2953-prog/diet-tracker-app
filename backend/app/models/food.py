@@ -54,6 +54,7 @@ class NutritionPerServingDto(BaseModel):
 class FoodSearchItemDto(BaseModel):
     id: str
     name: str
+    displayName: str | None = None
     brandName: str | None
     servingSize: float | None = Field(default=None, ge=0)
     servingUnit: str | None
@@ -64,12 +65,24 @@ class FoodSearchItemDto(BaseModel):
     sourceServingId: str | None = None
     servingDescription: str | None = None
     sourceRegion: str | None = None
+    wasLocalized: bool | None = None
+    displayLocale: str | None = None
+    localizer: str | None = None
 
     @classmethod
-    def from_record(cls, record: FoodSearchRecord) -> "FoodSearchItemDto":
+    def from_record(
+        cls,
+        record: FoodSearchRecord,
+        *,
+        display_name: str | None = None,
+        was_localized: bool | None = None,
+        display_locale: str | None = None,
+        localizer: str | None = None,
+    ) -> "FoodSearchItemDto":
         return cls(
             id=record.id,
             name=record.name,
+            displayName=display_name,
             brandName=record.brand_name,
             servingSize=record.serving_size,
             servingUnit=record.serving_unit,
@@ -85,6 +98,9 @@ class FoodSearchItemDto(BaseModel):
             sourceServingId=record.source_serving_id,
             servingDescription=record.serving_description,
             sourceRegion=record.source_region,
+            wasLocalized=was_localized,
+            displayLocale=display_locale,
+            localizer=localizer,
         )
 
 

@@ -2,8 +2,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.models.food import FoodSearchItemDto, FoodSearchQueryDto, FoodSearchResponseDto
+from app.models.food import (
+    FoodSearchItemDto,
+    FoodSearchQueryDto,
+    FoodSearchRecord,
+    FoodSearchResponseDto,
+)
 from app.services.food_search import FoodSearchService, get_food_search_service
+from app.services.food_name_localization import FoodNameLocalizer, get_food_name_localizer
 from app.services.query_translation import FoodSearchQueryTranslation
 
 router = APIRouter(prefix="/foods", tags=["foods"])
@@ -13,6 +19,7 @@ router = APIRouter(prefix="/foods", tags=["foods"])
 async def search_foods(
     q: Annotated[str, Query(description="Food name search text")],
     service: Annotated[FoodSearchService, Depends(get_food_search_service)],
+    food_name_localizer: Annotated[FoodNameLocalizer, Depends(get_food_name_localizer)],
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(alias="pageSize", ge=1, le=50)] = 20,
 ) -> FoodSearchResponseDto:
@@ -31,11 +38,30 @@ async def search_foods(
     )
 
     return FoodSearchResponseDto(
-        items=[FoodSearchItemDto.from_record(food) for food in service_response.items],
+        items=[
+            _food_item_dto_from_record(food, food_name_localizer)
+            for food in service_response.items
+        ],
         page=service_response.page,
         pageSize=service_response.page_size,
         hasMore=service_response.has_more,
         query=_query_dto_from_translation(service_response.query),
+    )
+
+
+def _food_item_dto_from_record(
+    record: FoodSearchRecord,
+    food_name_localizer: FoodNameLocalizer,
+) -> FoodSearchItemDto:
+    source_food_name = record.source_food_name or record.name
+    localization = food_name_localizer.localize(source_food_name)
+
+    return FoodSearchItemDto.from_record(
+        record,
+        display_name=localization.display_name,
+        was_localized=localization.was_localized,
+        display_locale=localization.display_locale,
+        localizer=localization.localizer_name,
     )
 
 

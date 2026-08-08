@@ -31,6 +31,7 @@ export type Food = {
   sourceFoodId: string;
   sourceFoodName?: string;
   name: string;
+  displayName?: string;
   brandName: string | null;
   category: string | null;
   servingSize: number | null;
@@ -41,6 +42,9 @@ export type Food = {
   sourceServingId?: string;
   servingDescription?: string;
   sourceRegion?: string;
+  wasLocalized?: boolean;
+  displayLocale?: string;
+  localizer?: string;
 };
 
 export type MealFood = {

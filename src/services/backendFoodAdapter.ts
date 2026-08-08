@@ -15,6 +15,7 @@ export type BackendFoodNutritionPerServingDto = {
 export type BackendFoodSearchItemDto = {
   id: string;
   name: string;
+  displayName?: string;
   brandName: string | null;
   servingSize: number | null;
   servingUnit: string | null;
@@ -25,6 +26,9 @@ export type BackendFoodSearchItemDto = {
   sourceServingId?: string;
   servingDescription?: string;
   sourceRegion?: string;
+  wasLocalized?: boolean;
+  displayLocale?: string;
+  localizer?: string;
 };
 
 export type BackendFoodSearchResponseDto = {
@@ -123,6 +127,10 @@ export function adaptBackendFoodSearchItem(
     food.dataSource = dto.dataSource;
   }
 
+  if (dto.displayName !== undefined) {
+    food.displayName = dto.displayName;
+  }
+
   if (dto.sourceFoodName !== undefined) {
     food.sourceFoodName = dto.sourceFoodName;
   }
@@ -139,6 +147,18 @@ export function adaptBackendFoodSearchItem(
     food.sourceRegion = dto.sourceRegion;
   }
 
+  if (dto.wasLocalized !== undefined) {
+    food.wasLocalized = dto.wasLocalized;
+  }
+
+  if (dto.displayLocale !== undefined) {
+    food.displayLocale = dto.displayLocale;
+  }
+
+  if (dto.localizer !== undefined) {
+    food.localizer = dto.localizer;
+  }
+
   return food;
 }
 
@@ -150,11 +170,15 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
   const servingSize = parseNullableNonNegativeNumber(value.servingSize);
   const nutritionPerServing = parseBackendFoodNutrition(value.nutritionPerServing);
   const dataSource = parseOptionalDataSource(value.dataSource);
+  const displayName = parseOptionalString(value.displayName);
   const sourceFoodId = parseOptionalString(value.sourceFoodId);
   const sourceFoodName = parseOptionalString(value.sourceFoodName);
   const sourceServingId = parseOptionalString(value.sourceServingId);
   const servingDescription = parseOptionalString(value.servingDescription);
   const sourceRegion = parseOptionalString(value.sourceRegion);
+  const wasLocalized = parseOptionalBoolean(value.wasLocalized);
+  const displayLocale = parseOptionalString(value.displayLocale);
+  const localizer = parseOptionalString(value.localizer);
 
   if (
     !isNonEmptyString(value.id)
@@ -164,11 +188,15 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
     || !isNullableString(value.servingUnit)
     || nutritionPerServing === null
     || dataSource === null
+    || displayName === null
     || sourceFoodId === null
     || sourceFoodName === null
     || sourceServingId === null
     || servingDescription === null
     || sourceRegion === null
+    || wasLocalized === null
+    || displayLocale === null
+    || localizer === null
   ) {
     return null;
   }
@@ -176,6 +204,7 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
   return {
     id: value.id,
     name: value.name,
+    ...(displayName !== undefined ? { displayName } : {}),
     brandName: value.brandName,
     servingSize,
     servingUnit: value.servingUnit,
@@ -186,6 +215,9 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
     ...(sourceServingId !== undefined ? { sourceServingId } : {}),
     ...(servingDescription !== undefined ? { servingDescription } : {}),
     ...(sourceRegion !== undefined ? { sourceRegion } : {}),
+    ...(wasLocalized !== undefined ? { wasLocalized } : {}),
+    ...(displayLocale !== undefined ? { displayLocale } : {}),
+    ...(localizer !== undefined ? { localizer } : {}),
   };
 }
 
@@ -265,6 +297,16 @@ function parseNullableNonNegativeNumber(value: unknown): number | null | undefin
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? value
     : undefined;
+}
+
+function parseOptionalBoolean(value: unknown): boolean | undefined | null {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  return typeof value === 'boolean'
+    ? value
+    : null;
 }
 
 function parseOptionalDataSource(value: unknown): FoodDataSource | undefined | null {

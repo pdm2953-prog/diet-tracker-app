@@ -2,10 +2,18 @@ import type { Food, FoodSearchQueryMetadata } from '../models';
 import { mockFoodSearchFoods } from '../mockFoodSearchData';
 import type { BackendServiceConfig } from './backendConfig';
 import { createBackendServiceConfig } from './backendConfig';
-import { createBackendFoodSearchProvider } from './backendFoodSearch';
+import {
+  createBackendFoodSearchProvider,
+  DEFAULT_BACKEND_FOOD_SEARCH_PAGE_SIZE,
+} from './backendFoodSearch';
 import { isAbortError } from './abortError';
 
-export const FOOD_SEARCH_RESULT_LIMIT = 20;
+export const FOOD_SEARCH_RESULT_LIMIT = DEFAULT_BACKEND_FOOD_SEARCH_PAGE_SIZE;
+
+export function getDefaultFoodSearchResultLimit(): number {
+  return FOOD_SEARCH_RESULT_LIMIT;
+}
+
 export const MIN_FOOD_SEARCH_QUERY_LENGTH = 2;
 export const FOOD_SEARCH_CONNECTION_ERROR_MESSAGE = '검색 서버에 연결할 수 없습니다';
 
@@ -56,6 +64,7 @@ function normalizeSearchText(value: string): string {
 
 function buildFoodSearchText(food: Food): string {
   return [
+    food.displayName,
     food.name,
     food.brandName,
     food.category,

@@ -12,6 +12,7 @@ import {
 import type { FoodSearchResult } from '../services/foodSearch';
 import { styles } from '../styles';
 import { formatServingText, parseNumberInput } from '../utils/format';
+import { getDevelopmentSourceFoodName, getFoodDisplayName } from '../utils/foodDisplay';
 import { NoticeBox, PrimaryButton, SecondaryButton } from './ui';
 
 export type FoodPortionModalState = {
@@ -56,6 +57,8 @@ export function FoodPortionModal({
       )
     : null;
   const macroFields = primaryNutritionFields.filter((field) => field !== 'caloriesKcal');
+  const foodDisplayName = getFoodDisplayName(state.food);
+  const sourceFoodName = getDevelopmentSourceFoodName(state.food);
 
   return (
     <Modal
@@ -73,7 +76,7 @@ export function FoodPortionModal({
           style={styles.modalScrim}
         />
         <View
-          accessibilityLabel={`${state.food.name} 섭취량 입력 대화상자`}
+          accessibilityLabel={`${foodDisplayName} 섭취량 입력 대화상자`}
           role="dialog"
           accessibilityViewIsModal
           aria-modal={true}
@@ -83,7 +86,10 @@ export function FoodPortionModal({
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.portionHeader}>
               <Text style={styles.portionModalTitle}>섭취량 입력</Text>
-              <Text style={styles.portionFoodName}>{state.food.name}</Text>
+              <Text style={styles.portionFoodName}>{foodDisplayName}</Text>
+              {sourceFoodName !== null ? (
+                <Text style={styles.portionSourceFoodName}>{sourceFoodName}</Text>
+              ) : null}
               <Text style={styles.portionServingText}>
                 기준 제공량 {formatServingText(state.food)}
               </Text>
@@ -93,7 +99,7 @@ export function FoodPortionModal({
               <Text style={styles.portionInputLabel}>먹은 양</Text>
               <View style={styles.portionInputRow}>
                 <TextInput
-                  accessibilityLabel={`${state.food.name} 섭취 g 수 입력`}
+                  accessibilityLabel={`${foodDisplayName} 섭취 g 수 입력`}
                   autoFocus
                   keyboardType="decimal-pad"
                   onChangeText={onChangeGramsInput}

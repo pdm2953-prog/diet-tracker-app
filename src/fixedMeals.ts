@@ -15,6 +15,7 @@ import {
   normalizeConsumedGrams,
 } from './meals';
 import { isValidLocalDateString } from './utils/date';
+import { getFoodDisplayName } from './utils/foodDisplay';
 
 export type ApplyFixedMealTemplatesOptions = {
   date: string;
@@ -241,7 +242,7 @@ export function createDailyFixedMealTemplateFromMealFood({
 
   return {
     id: templateId,
-    name: `${food.name} 고정 식단`,
+    name: `${getFoodDisplayName(food)} 고정 식단`,
     mealType,
     schedule: 'daily',
     isActive: true,

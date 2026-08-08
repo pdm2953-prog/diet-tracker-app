@@ -204,10 +204,15 @@ test('addFoodToMeals keeps FatSecret metadata food selectable with gram input', 
     id: 'fatsecret-123-456',
     sourceFoodId: '123',
     sourceFoodName: 'Chicken Breast',
+    name: 'Chicken Breast',
+    displayName: '닭가슴살',
     dataSource: 'fatsecret',
     sourceServingId: '456',
     servingDescription: '100 g',
     sourceRegion: 'KR',
+    wasLocalized: true,
+    displayLocale: 'ko-KR',
+    localizer: 'korean_food_name',
   });
   const meals = [makeMeal('breakfast', [])];
 
@@ -219,7 +224,10 @@ test('addFoodToMeals keeps FatSecret metadata food selectable with gram input', 
   const mealFood = updatedMeals[0].foods[0];
 
   assert.equal(mealFood.foodId, 'fatsecret-123-456');
+  assert.equal(fatSecretFood.name, 'Chicken Breast');
   assert.equal(fatSecretFood.sourceFoodName, 'Chicken Breast');
+  assert.equal(fatSecretFood.displayName, '닭가슴살');
+  assert.equal(fatSecretFood.wasLocalized, true);
   assert.equal(mealFood.consumedGrams, 150);
   assert.equal(mealFood.calculatedNutrition.caloriesKcal, 300);
   assert.equal(mealFood.calculatedNutrition.carbohydrateG, 75);
