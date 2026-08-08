@@ -1,4 +1,4 @@
-import type { Food } from '../models';
+import type { Food, FoodSearchQueryMetadata } from '../models';
 import {
   adaptBackendFoodSearchResponse,
   parseBackendFoodSearchResponse,
@@ -6,7 +6,7 @@ import {
 import type { BackendServiceConfig } from './backendConfig';
 import { createBackendServiceConfig } from './backendConfig';
 import { createAbortError, isAbortError } from './abortError';
-import type { FoodSearchOptions, FoodSearchProvider } from './foodSearch';
+import type { FoodSearchOptions, FoodSearchProvider, FoodSearchProviderResponse } from './foodSearch';
 
 export type BackendFoodSearchErrorCode =
   | 'http-error'
@@ -22,6 +22,7 @@ export type BackendFoodSearchSuccess = {
   page: number;
   pageSize: number;
   hasMore: boolean;
+  query?: FoodSearchQueryMetadata;
 };
 
 export type BackendFoodSearchFailure = {
@@ -162,24 +163,35 @@ export async function searchBackendFoods(
 export function createBackendFoodSearchProvider(
   config: BackendServiceConfig = createBackendServiceConfig(),
 ): FoodSearchProvider {
-  return {
-    async searchFoods(query: string, options?: FoodSearchOptions): Promise<Food[]> {
-      const result = await searchBackendFoods(query, {
-        config,
-        pageSize: options?.limit,
-        signal: options?.signal,
-      });
+  const searchFoodsWithMetadata = async (
+    query: string,
+    options?: FoodSearchOptions,
+  ): Promise<FoodSearchProviderResponse> => {
+    const result = await searchBackendFoods(query, {
+      config,
+      pageSize: options?.limit,
+      signal: options?.signal,
+    });
 
-      if (!result.ok) {
-        if (result.errorCode === 'aborted') {
-          throw createAbortError(result.errorMessage);
-        }
-
-        throw new Error(result.errorMessage);
+    if (!result.ok) {
+      if (result.errorCode === 'aborted') {
+        throw createAbortError(result.errorMessage);
       }
 
-      return result.items;
+      throw new Error(result.errorMessage);
+    }
+
+    return {
+      results: result.items,
+      ...(result.query !== undefined ? { query: result.query } : {}),
+    };
+  };
+
+  return {
+    async searchFoods(query: string, options?: FoodSearchOptions): Promise<Food[]> {
+      return (await searchFoodsWithMetadata(query, options)).results;
     },
+    searchFoodsWithMetadata,
   };
 }
 
@@ -212,5 +224,3 @@ function createFailure(
     status,
   };
 }
-
-

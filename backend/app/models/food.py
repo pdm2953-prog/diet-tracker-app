@@ -1,16 +1,28 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+FoodDataSource = Literal["mock", "fatsecret"]
+FoodSearchQueryStatus = Literal["identity", "translated", "unresolved"]
 
 
 class FoodSearchRecord(BaseModel):
     id: str
+    data_source: FoodDataSource
+    source_food_id: str | None = None
+    source_food_name: str | None = None
+    source_serving_id: str | None = None
     name: str
     brand_name: str | None
-    serving_size: float | None = Field(ge=0)
+    serving_description: str | None = None
+    serving_size: float | None = Field(default=None, ge=0)
     serving_unit: str | None
-    calories_kcal: float | None = Field(ge=0)
-    protein_g: float | None = Field(ge=0)
-    carbs_g: float | None = Field(ge=0)
-    fat_g: float | None = Field(ge=0)
+    calories_kcal: float | None = Field(default=None, ge=0)
+    protein_g: float | None = Field(default=None, ge=0)
+    carbs_g: float | None = Field(default=None, ge=0)
+    fat_g: float | None = Field(default=None, ge=0)
+    source_region: str | None = None
     keywords: tuple[str, ...] = ()
 
     @property
@@ -18,6 +30,10 @@ class FoodSearchRecord(BaseModel):
         searchable_values = (
             self.name,
             self.brand_name,
+            self.source_food_id,
+            self.source_food_name,
+            self.source_serving_id,
+            self.serving_description,
             *self.keywords,
         )
 
@@ -42,6 +58,12 @@ class FoodSearchItemDto(BaseModel):
     servingSize: float | None = Field(default=None, ge=0)
     servingUnit: str | None
     nutritionPerServing: NutritionPerServingDto
+    dataSource: FoodDataSource | None = None
+    sourceFoodId: str | None = None
+    sourceFoodName: str | None = None
+    sourceServingId: str | None = None
+    servingDescription: str | None = None
+    sourceRegion: str | None = None
 
     @classmethod
     def from_record(cls, record: FoodSearchRecord) -> "FoodSearchItemDto":
@@ -57,7 +79,21 @@ class FoodSearchItemDto(BaseModel):
                 carbsG=record.carbs_g,
                 fatG=record.fat_g,
             ),
+            dataSource=record.data_source,
+            sourceFoodId=record.source_food_id,
+            sourceFoodName=record.source_food_name,
+            sourceServingId=record.source_serving_id,
+            servingDescription=record.serving_description,
+            sourceRegion=record.source_region,
         )
+
+
+class FoodSearchQueryDto(BaseModel):
+    original: str
+    resolved: str
+    wasTranslated: bool
+    translator: str
+    status: FoodSearchQueryStatus
 
 
 class FoodSearchResponseDto(BaseModel):
@@ -65,3 +101,4 @@ class FoodSearchResponseDto(BaseModel):
     page: int = Field(ge=1)
     pageSize: int = Field(ge=1)
     hasMore: bool
+    query: FoodSearchQueryDto | None = None

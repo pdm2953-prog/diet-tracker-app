@@ -198,3 +198,29 @@ test('addFoodToMeals keeps merged duplicate unchecked when all matches are unche
   assert.equal(mergedFoods[0].calculatedNutrition.carbohydrateG, 50);
   assert.equal(mergedFoods[0].calculatedNutrition.proteinG, 10);
 });
+
+test('addFoodToMeals keeps FatSecret metadata food selectable with gram input', () => {
+  const fatSecretFood = makeFood({
+    id: 'fatsecret-123-456',
+    sourceFoodId: '123',
+    sourceFoodName: 'Chicken Breast',
+    dataSource: 'fatsecret',
+    sourceServingId: '456',
+    servingDescription: '100 g',
+    sourceRegion: 'KR',
+  });
+  const meals = [makeMeal('breakfast', [])];
+
+  const updatedMeals = addFoodToMeals(meals, fatSecretFood, 'breakfast', 150, {
+    createMealFoodId: (foodId) => `created-${foodId}`,
+    updatedAt: '2026-07-07T01:00:00.000Z',
+  });
+
+  const mealFood = updatedMeals[0].foods[0];
+
+  assert.equal(mealFood.foodId, 'fatsecret-123-456');
+  assert.equal(fatSecretFood.sourceFoodName, 'Chicken Breast');
+  assert.equal(mealFood.consumedGrams, 150);
+  assert.equal(mealFood.calculatedNutrition.caloriesKcal, 300);
+  assert.equal(mealFood.calculatedNutrition.carbohydrateG, 75);
+});

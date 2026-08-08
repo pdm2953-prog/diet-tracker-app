@@ -804,6 +804,12 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: spacing.md,
   },
+  searchQueryDebugText: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    lineHeight: typography.lineHeight.sm,
+    marginTop: spacing.xs,
+  },
   searchResultList: {
     gap: spacing.md,
     marginTop: spacing.md,

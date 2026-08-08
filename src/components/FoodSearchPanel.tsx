@@ -2,7 +2,7 @@ import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 
 import { colors, mealLabels } from '../constants';
 import { hasValidGramServing } from '../meals';
-import type { MealType } from '../models';
+import type { FoodDataSource, FoodSearchQueryMetadata, MealType } from '../models';
 import {
   formatNutritionValue,
   nutritionLabels,
@@ -22,6 +22,7 @@ type FoodSearchPanelProps = {
   onQueryChange: (query: string) => void;
   onSelectFood: (food: FoodSearchResult) => void;
   query: string;
+  queryMetadata: FoodSearchQueryMetadata | null;
   results: FoodSearchResult[];
   searchError: string | null;
 };
@@ -34,9 +35,12 @@ export function FoodSearchPanel({
   onQueryChange,
   onSelectFood,
   query,
+  queryMetadata,
   results,
   searchError,
 }: FoodSearchPanelProps) {
+  const translationNotice = formatTranslationNotice(queryMetadata);
+
   return (
     <Modal
       animationType="fade"
@@ -103,6 +107,16 @@ export function FoodSearchPanel({
               <NoticeBox message={searchError} title="검색 오류" variant="danger" />
             ) : null}
 
+            {translationNotice !== null ? (
+              <NoticeBox message={translationNotice} title="검색어 변환" />
+            ) : null}
+
+            {shouldShowQueryDebug(queryMetadata) ? (
+              <Text style={styles.searchQueryDebugText}>
+                {queryMetadata.original} → {queryMetadata.resolved} 검색
+              </Text>
+            ) : null}
+
             {hasSearched && !isSearching && searchError === null && results.length === 0 ? (
               <EmptyState
                 icon="-"
@@ -138,6 +152,7 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
   const missingPrimaryFields = getMissingPrimaryFields(food.nutritionPerServing);
   const canAddFood = hasValidGramServing(food);
   const macroFields = primaryNutritionFields.filter((field) => field !== 'caloriesKcal');
+  const dataSourceLabel = formatDataSourceLabel(food.dataSource);
 
   return (
     <View style={styles.searchResultCard}>
@@ -145,6 +160,9 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
         <View style={styles.searchResultTitleBlock}>
           <View style={styles.searchResultStatusRow}>
             <Text style={styles.searchResultName}>{food.name}</Text>
+            {shouldShowDataSourceBadge(food.dataSource) && dataSourceLabel !== null ? (
+              <StatusBadge icon="i" label={dataSourceLabel} tone="info" />
+            ) : null}
             {!canAddFood ? (
               <StatusBadge label="추가 불가" tone="warning" />
             ) : missingPrimaryFields.length > 0 ? (
@@ -193,4 +211,45 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
       />
     </View>
   );
+}
+
+function formatTranslationNotice(query: FoodSearchQueryMetadata | null): string | null {
+  if (
+    query === null
+    || !query.wasTranslated
+    || query.original === query.resolved
+  ) {
+    return null;
+  }
+
+  return `'${query.original}'을 '${query.resolved}'로 검색한 결과입니다.`;
+}
+
+function shouldShowQueryDebug(query: FoodSearchQueryMetadata | null): query is FoodSearchQueryMetadata {
+  return isDevelopmentMode()
+    && query !== null
+    && query.wasTranslated
+    && query.original !== query.resolved;
+}
+
+function shouldShowDataSourceBadge(dataSource: FoodDataSource | undefined): boolean {
+  return isDevelopmentMode() && dataSource !== undefined;
+}
+
+function isDevelopmentMode(): boolean {
+  const globalValue = globalThis as typeof globalThis & { __DEV__?: boolean };
+
+  return globalValue.__DEV__ === true;
+}
+
+function formatDataSourceLabel(dataSource: FoodDataSource | undefined): string | null {
+  if (dataSource === 'mock') {
+    return 'Mock 데이터';
+  }
+
+  if (dataSource === 'fatsecret') {
+    return 'FatSecret';
+  }
+
+  return null;
 }

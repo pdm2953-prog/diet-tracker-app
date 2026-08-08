@@ -19,10 +19,33 @@ class Settings(BaseSettings):
         default=",".join(DEFAULT_CORS_ORIGINS),
         validation_alias="BACKEND_CORS_ORIGINS",
     )
+    food_provider: str = Field(default="mock", validation_alias="FOOD_PROVIDER")
+    fatsecret_api_edition: str = Field(
+        default="basic",
+        validation_alias="FATSECRET_API_EDITION",
+    )
     fatsecret_client_id: str | None = Field(default=None, validation_alias="FATSECRET_CLIENT_ID")
     fatsecret_client_secret: str | None = Field(
         default=None,
         validation_alias="FATSECRET_CLIENT_SECRET",
+    )
+    fatsecret_region: str | None = Field(default=None, validation_alias="FATSECRET_REGION")
+    fatsecret_language: str | None = Field(default=None, validation_alias="FATSECRET_LANGUAGE")
+    fatsecret_timeout_seconds: float = Field(
+        default=10.0,
+        validation_alias="FATSECRET_TIMEOUT_SECONDS",
+    )
+    fatsecret_token_refresh_margin_seconds: float = Field(
+        default=60.0,
+        validation_alias="FATSECRET_TOKEN_REFRESH_MARGIN_SECONDS",
+    )
+    fatsecret_basic_max_results: int = Field(
+        default=10,
+        validation_alias="FATSECRET_BASIC_MAX_RESULTS",
+    )
+    fatsecret_detail_concurrency: int = Field(
+        default=4,
+        validation_alias="FATSECRET_DETAIL_CONCURRENCY",
     )
 
     model_config = SettingsConfigDict(

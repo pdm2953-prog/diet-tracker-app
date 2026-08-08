@@ -16,6 +16,7 @@ import {
   defaultFoodSearchProvider,
   FOOD_SEARCH_CONNECTION_ERROR_MESSAGE,
 } from '../src/services/foodSearch';
+import type { FoodSearchQueryMetadata } from '../src/models';
 import type {
   FoodSearchProvider,
   FoodSearchResult,
@@ -47,6 +48,7 @@ const backendFoodDto = {
   id: 'mock-chicken-breast',
   name: '닭가슴살',
   brandName: null,
+  sourceFoodName: '닭가슴살',
   servingSize: 100,
   servingUnit: 'g',
   nutritionPerServing: {
@@ -86,10 +88,35 @@ test('adaptBackendFoodSearchItem maps backend DTO to Food and preserves zero val
   assert.equal(food.id, 'mock-chicken-breast');
   assert.equal(food.source, 'backend-food-search');
   assert.equal(food.sourceFoodId, 'mock-chicken-breast');
+  assert.equal(food.sourceFoodName, '닭가슴살');
   assert.equal(food.brandName, null);
   assert.equal(food.category, null);
   assert.equal(food.nutritionPerServing.carbohydrateG, 0);
   assert.equal(food.nutritionPerServing.sugarsG, null);
+});
+
+test('adaptBackendFoodSearchItem safely maps optional FatSecret metadata', () => {
+  const food = adaptBackendFoodSearchItem({
+    ...backendFoodDto,
+    dataSource: 'fatsecret',
+    id: 'fatsecret-123-456',
+    sourceFoodId: '123',
+    sourceFoodName: 'Chicken Breast',
+    sourceServingId: '456',
+    servingDescription: '100 g',
+    sourceRegion: 'KR',
+  }, {
+    updatedAt: '2026-07-30T00:00:00.000Z',
+  });
+
+  assert.equal(food.id, 'fatsecret-123-456');
+  assert.equal(food.sourceFoodId, '123');
+  assert.equal(food.sourceFoodName, 'Chicken Breast');
+  assert.equal(food.dataSource, 'fatsecret');
+  assert.equal(food.sourceServingId, '456');
+  assert.equal(food.servingDescription, '100 g');
+  assert.equal(food.sourceRegion, 'KR');
+  assert.equal(food.nutritionPerServing.carbohydrateG, 0);
 });
 
 test('searchBackendFoods calls foods search API with q and adapts one backend item', async () => {
@@ -100,6 +127,13 @@ test('searchBackendFoods calls foods search API with q and adapts one backend it
     page: 1,
     pageSize: 20,
     hasMore: false,
+    query: {
+      original: '닭가슴살',
+      resolved: 'chicken breast',
+      wasTranslated: true,
+      translator: 'korean_food_alias',
+      status: 'translated',
+    },
   };
 
   const result = await searchBackendFoods('닭가슴살', {
@@ -133,6 +167,10 @@ test('searchBackendFoods calls foods search API with q and adapts one backend it
     assert.equal(result.items[0]?.name, '닭가슴살');
     assert.equal(result.items[0]?.brandName, null);
     assert.equal(result.items[0]?.nutritionPerServing.carbohydrateG, 0);
+    assert.equal(result.query?.original, '닭가슴살');
+    assert.equal(result.query?.resolved, 'chicken breast');
+    assert.equal(result.query?.wasTranslated, true);
+    assert.equal(result.query?.translator, 'korean_food_alias');
   }
 });
 
@@ -258,28 +296,47 @@ test('runFoodSearchRequest maps backend failures to panel error state', async ()
   assert.equal(isSearching, false);
 });
 
-test('runFoodSearchRequest applies one successful backend result to panel results', async () => {
+test('runFoodSearchRequest applies one successful backend result and query metadata to panel state', async () => {
+  const queryMetadata = {
+    original: '닭가슴살',
+    resolved: 'chicken breast',
+    wasTranslated: true,
+    translator: 'korean_food_alias',
+    status: 'translated' as const,
+  };
   const provider: FoodSearchProvider = {
     async searchFoods() {
       return [makeFoodSearchResult('mock-chicken-breast', '닭가슴살')];
+    },
+    async searchFoodsWithMetadata() {
+      return {
+        results: [makeFoodSearchResult('mock-chicken-breast', 'Chicken Breast')],
+        query: queryMetadata,
+      };
     },
   };
   const gate = createFoodSearchRequestGate();
   let searchError: string | null = 'previous error';
   let searchResults: FoodSearchResult[] = [];
+  const appliedState: { queryMetadata: FoodSearchQueryMetadata | null } = {
+    queryMetadata: null,
+  };
 
   const result = await runFoodSearchRequest({
     callbacks: {
       onStart: () => {
         searchError = null;
         searchResults = [];
+        appliedState.queryMetadata = null;
       },
-      onSuccess: (results) => {
+      onSuccess: (results, metadata) => {
         searchResults = results;
+        appliedState.queryMetadata = metadata ?? null;
       },
       onError: (message) => {
         searchError = message;
         searchResults = [];
+        appliedState.queryMetadata = null;
       },
       onFinish: () => {},
     },
@@ -292,7 +349,13 @@ test('runFoodSearchRequest applies one successful backend result to panel result
   assert.equal(result.status, 'success');
   assert.equal(searchError, null);
   assert.equal(searchResults.length, 1);
-  assert.equal(searchResults[0]?.name, '닭가슴살');
+  assert.equal(searchResults[0]?.name, 'Chicken Breast');
+  assert.equal(searchResults[0]?.nutritionPerServing.carbohydrateG, 0);
+  assert.equal(appliedState.queryMetadata?.resolved, 'chicken breast');
+
+  if (result.status === 'success') {
+    assert.equal(result.query?.original, '닭가슴살');
+  }
 });
 
 test('runFoodSearchRequest prevents older search results from overwriting latest results', async () => {
@@ -504,6 +567,26 @@ test('scheduleFoodSearchRequest aborts in-flight search without surfacing UI err
 
   assert.equal(readAbortSignalState(requestSignal), true);
   assert.deepEqual(errorMessages, []);
+});
+
+test('parseBackendFoodSearchResponse parses optional query metadata', () => {
+  const parsedResponse = parseBackendFoodSearchResponse({
+    items: [],
+    page: 1,
+    pageSize: 10,
+    hasMore: false,
+    query: {
+      original: '닭가슴살',
+      resolved: 'chicken breast',
+      wasTranslated: true,
+      translator: 'korean_food_alias',
+      status: 'translated',
+    },
+  });
+
+  assert.equal(parsedResponse?.query?.original, '닭가슴살');
+  assert.equal(parsedResponse?.query?.resolved, 'chicken breast');
+  assert.equal(parsedResponse?.query?.wasTranslated, true);
 });
 
 test('parseBackendFoodSearchResponse rejects invalid response shapes', () => {

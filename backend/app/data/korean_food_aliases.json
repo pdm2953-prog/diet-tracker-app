@@ -1,0 +1,19 @@
+[
+  { "aliases": ["닭가슴살", "닭 가슴살"], "resolved": "chicken breast" },
+  { "aliases": ["계란", "달걀"], "resolved": "egg" },
+  { "aliases": ["삶은 계란"], "resolved": "boiled egg" },
+  { "aliases": ["고구마"], "resolved": "sweet potato" },
+  { "aliases": ["감자"], "resolved": "potato" },
+  { "aliases": ["바나나"], "resolved": "banana" },
+  { "aliases": ["사과"], "resolved": "apple" },
+  { "aliases": ["현미밥"], "resolved": "brown rice" },
+  { "aliases": ["흰쌀밥", "쌀밥"], "resolved": "white rice" },
+  { "aliases": ["우유"], "resolved": "milk" },
+  { "aliases": ["두부"], "resolved": "tofu" },
+  { "aliases": ["연어"], "resolved": "salmon" },
+  { "aliases": ["참치"], "resolved": "tuna" },
+  { "aliases": ["소고기"], "resolved": "beef" },
+  { "aliases": ["돼지고기"], "resolved": "pork" },
+  { "aliases": ["닭고기"], "resolved": "chicken" },
+  { "aliases": ["오트밀"], "resolved": "oatmeal" }
+]

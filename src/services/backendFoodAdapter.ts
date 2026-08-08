@@ -1,4 +1,9 @@
-import type { Food } from '../models';
+import type {
+  Food,
+  FoodDataSource,
+  FoodSearchQueryMetadata,
+  FoodSearchQueryStatus,
+} from '../models';
 
 export type BackendFoodNutritionPerServingDto = {
   caloriesKcal: number | null;
@@ -14,6 +19,12 @@ export type BackendFoodSearchItemDto = {
   servingSize: number | null;
   servingUnit: string | null;
   nutritionPerServing: BackendFoodNutritionPerServingDto;
+  dataSource?: FoodDataSource;
+  sourceFoodId?: string;
+  sourceFoodName?: string;
+  sourceServingId?: string;
+  servingDescription?: string;
+  sourceRegion?: string;
 };
 
 export type BackendFoodSearchResponseDto = {
@@ -21,6 +32,7 @@ export type BackendFoodSearchResponseDto = {
   page: number;
   pageSize: number;
   hasMore: boolean;
+  query?: FoodSearchQueryMetadata;
 };
 
 export type AdaptBackendFoodOptions = {
@@ -34,10 +46,13 @@ export function parseBackendFoodSearchResponse(
     return null;
   }
 
+  const query = parseOptionalBackendFoodSearchQuery(value.query);
+
   if (
     !isPositiveInteger(value.page)
     || !isPositiveInteger(value.pageSize)
     || typeof value.hasMore !== 'boolean'
+    || query === null
   ) {
     return null;
   }
@@ -53,6 +68,7 @@ export function parseBackendFoodSearchResponse(
     page: value.page,
     pageSize: value.pageSize,
     hasMore: value.hasMore,
+    ...(query !== undefined ? { query } : {}),
   };
 }
 
@@ -64,12 +80,14 @@ export function adaptBackendFoodSearchResponse(
   page: number;
   pageSize: number;
   hasMore: boolean;
+  query?: FoodSearchQueryMetadata;
 } {
   return {
     items: dto.items.map((item) => adaptBackendFoodSearchItem(item, options)),
     page: dto.page,
     pageSize: dto.pageSize,
     hasMore: dto.hasMore,
+    ...(dto.query !== undefined ? { query: dto.query } : {}),
   };
 }
 
@@ -77,10 +95,10 @@ export function adaptBackendFoodSearchItem(
   dto: BackendFoodSearchItemDto,
   options: AdaptBackendFoodOptions = {},
 ): Food {
-  return {
+  const food: Food = {
     id: dto.id,
     source: 'backend-food-search',
-    sourceFoodId: dto.id,
+    sourceFoodId: dto.sourceFoodId ?? dto.id,
     name: dto.name,
     brandName: dto.brandName,
     category: null,
@@ -100,6 +118,28 @@ export function adaptBackendFoodSearchItem(
     },
     updatedAt: options.updatedAt ?? new Date().toISOString(),
   };
+
+  if (dto.dataSource !== undefined) {
+    food.dataSource = dto.dataSource;
+  }
+
+  if (dto.sourceFoodName !== undefined) {
+    food.sourceFoodName = dto.sourceFoodName;
+  }
+
+  if (dto.sourceServingId !== undefined) {
+    food.sourceServingId = dto.sourceServingId;
+  }
+
+  if (dto.servingDescription !== undefined) {
+    food.servingDescription = dto.servingDescription;
+  }
+
+  if (dto.sourceRegion !== undefined) {
+    food.sourceRegion = dto.sourceRegion;
+  }
+
+  return food;
 }
 
 function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | null {
@@ -109,6 +149,12 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
 
   const servingSize = parseNullableNonNegativeNumber(value.servingSize);
   const nutritionPerServing = parseBackendFoodNutrition(value.nutritionPerServing);
+  const dataSource = parseOptionalDataSource(value.dataSource);
+  const sourceFoodId = parseOptionalString(value.sourceFoodId);
+  const sourceFoodName = parseOptionalString(value.sourceFoodName);
+  const sourceServingId = parseOptionalString(value.sourceServingId);
+  const servingDescription = parseOptionalString(value.servingDescription);
+  const sourceRegion = parseOptionalString(value.sourceRegion);
 
   if (
     !isNonEmptyString(value.id)
@@ -117,6 +163,12 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
     || servingSize === undefined
     || !isNullableString(value.servingUnit)
     || nutritionPerServing === null
+    || dataSource === null
+    || sourceFoodId === null
+    || sourceFoodName === null
+    || sourceServingId === null
+    || servingDescription === null
+    || sourceRegion === null
   ) {
     return null;
   }
@@ -128,6 +180,12 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
     servingSize,
     servingUnit: value.servingUnit,
     nutritionPerServing,
+    ...(dataSource !== undefined ? { dataSource } : {}),
+    ...(sourceFoodId !== undefined ? { sourceFoodId } : {}),
+    ...(sourceFoodName !== undefined ? { sourceFoodName } : {}),
+    ...(sourceServingId !== undefined ? { sourceServingId } : {}),
+    ...(servingDescription !== undefined ? { servingDescription } : {}),
+    ...(sourceRegion !== undefined ? { sourceRegion } : {}),
   };
 }
 
@@ -156,6 +214,49 @@ function parseBackendFoodNutrition(
   };
 }
 
+function parseOptionalBackendFoodSearchQuery(
+  value: unknown,
+): FoodSearchQueryMetadata | undefined | null {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const translator = parseOptionalString(value.translator);
+  const status = parseOptionalQueryStatus(value.status);
+
+  if (
+    !isNonEmptyString(value.original)
+    || !isNonEmptyString(value.resolved)
+    || typeof value.wasTranslated !== 'boolean'
+    || translator === null
+    || status === null
+  ) {
+    return null;
+  }
+
+  return {
+    original: value.original,
+    resolved: value.resolved,
+    wasTranslated: value.wasTranslated,
+    ...(translator !== undefined ? { translator } : {}),
+    ...(status !== undefined ? { status } : {}),
+  };
+}
+
+function parseOptionalQueryStatus(value: unknown): FoodSearchQueryStatus | undefined | null {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  return value === 'identity' || value === 'translated' || value === 'unresolved'
+    ? value
+    : null;
+}
+
 function parseNullableNonNegativeNumber(value: unknown): number | null | undefined {
   if (value === null) {
     return null;
@@ -164,6 +265,26 @@ function parseNullableNonNegativeNumber(value: unknown): number | null | undefin
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? value
     : undefined;
+}
+
+function parseOptionalDataSource(value: unknown): FoodDataSource | undefined | null {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  return value === 'mock' || value === 'fatsecret'
+    ? value
+    : null;
+}
+
+function parseOptionalString(value: unknown): string | undefined | null {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  return typeof value === 'string'
+    ? value
+    : null;
 }
 
 function isPositiveInteger(value: unknown): value is number {

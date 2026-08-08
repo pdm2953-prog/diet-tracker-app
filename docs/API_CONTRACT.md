@@ -1,8 +1,8 @@
 # API Contract
 
-이 문서는 Expo React Native 앱과 FastAPI 백엔드 사이의 1차 로컬 통신 계약을 정의한다.
+이 문서는 Expo React Native 앱과 FastAPI 백엔드 사이의 음식 검색 계약을 정의한다.
 
-현재 단계에서는 FatSecret API를 실제로 호출하지 않는다. `FATSECRET_CLIENT_ID`와 `FATSECRET_CLIENT_SECRET` 설정 자리만 준비하고, 검색 API는 한국 음식 mock 데이터를 반환한다.
+프론트엔드는 FatSecret을 직접 호출하지 않는다. 음식 검색은 항상 FastAPI의 `/api/v1/foods/search`를 호출하고, 백엔드는 `FOOD_PROVIDER` 설정에 따라 `mock` 또는 `fatsecret` provider를 선택한다.
 
 ## Base URL
 
@@ -12,7 +12,7 @@
 http://127.0.0.1:8000
 ```
 
-프론트엔드는 `EXPO_PUBLIC_BACKEND_URL`로 백엔드 URL을 주입한다. 값이 없으면 개발 기본값 `http://127.0.0.1:8000`을 사용한다. 음식 검색 provider는 `EXPO_PUBLIC_FOOD_SEARCH_PROVIDER`로 선택한다.
+프론트엔드는 `EXPO_PUBLIC_BACKEND_URL`로 백엔드 URL을 주입한다. 값이 없으면 개발 기본값 `http://127.0.0.1:8000`을 사용한다. 프론트엔드 음식 검색 provider는 `EXPO_PUBLIC_FOOD_SEARCH_PROVIDER`로 선택한다.
 
 | 값 | 동작 |
 | --- | --- |
@@ -44,9 +44,9 @@ mock fallback은 `backend-with-mock-fallback`을 명시했을 때만 동작한�
 | --- | --- | --- | --- | --- |
 | `q` | string | 예 | 없음 | 검색어. 앞뒤 공백 제거 후 2자 이상이어야 한다. |
 | `page` | number | 아니오 | `1` | 1부터 시작하는 페이지 번호 |
-| `pageSize` | number | 아니오 | `20` | 페이지 크기. 현재 최대 `100` |
+| `pageSize` | number | 아니오 | `20` | 페이지 크기. 최대 `50` |
 
-공백 검색어, 2자 미만 검색어, `page < 1`, `pageSize < 1`, `pageSize > 100`은 `422` validation 오류로 처리한다.
+공백 검색어, 2자 미만 검색어, `page < 1`, `pageSize < 1`, `pageSize > 50`은 `422` validation 오류로 처리한다. FatSecret Basic provider는 외부 상세 조회 폭을 제한하기 위해 provider 내부에서 `pageSize`를 `FATSECRET_BASIC_MAX_RESULTS` 값으로 추가 제한하며 기본값과 최대 허용값은 `10`이다. Premier provider는 최대 `50` 정책을 유지한다.
 
 ### Response 200
 
@@ -54,26 +54,85 @@ mock fallback은 `backend-with-mock-fallback`을 명시했을 때만 동작한�
 {
   "items": [
     {
-      "id": "mock-chicken-breast",
-      "name": "닭가슴살",
+      "id": "fatsecret-123-456",
+      "name": "Chicken Breast",
       "brandName": null,
       "servingSize": 100,
       "servingUnit": "g",
       "nutritionPerServing": {
-        "caloriesKcal": 165,
-        "proteinG": 31,
+        "caloriesKcal": 109,
+        "proteinG": 22.98,
         "carbsG": 0,
-        "fatG": 3.6
-      }
+        "fatG": 1.2
+      },
+      "dataSource": "fatsecret",
+      "sourceFoodId": "123",
+      "sourceFoodName": "Chicken Breast",
+      "sourceServingId": "456",
+      "servingDescription": "100 g",
+      "sourceRegion": "US"
     }
   ],
   "page": 1,
   "pageSize": 20,
-  "hasMore": false
+  "hasMore": false,
+  "query": {
+    "original": "닭가슴살",
+    "resolved": "chicken breast",
+    "wasTranslated": true,
+    "translator": "korean_food_alias",
+    "status": "translated"
+  }
 }
 ```
 
-검색 결과가 없으면 `items: []`, `hasMore: false`를 반환한다.
+검색 결과가 없으면 `200`과 함께 `items: []`, `hasMore: false`를 반환한다. 외부 provider 인증, 권한, rate limit, timeout, invalid response는 검색 결과 없음으로 변환하지 않고 오류 상태 코드로 반환한다.
+
+### Optional metadata
+
+기존 frontend 계약을 깨지 않기 위해 다음 필드는 optional이다.
+
+| 필드 | 값 | 설명 |
+| --- | --- | --- |
+| `dataSource` | `mock` 또는 `fatsecret` | 개발 중 provider 출처 확인용 |
+| `sourceFoodId` | string | 원천 provider의 food id |
+| `sourceFoodName` | string | 원천 provider가 반환한 원본 음식명. 자체 DB migration 시 출처 추적용 |
+| `sourceServingId` | string 또는 null | 원천 provider의 serving id |
+| `servingDescription` | string 또는 null | 원천 provider의 serving 설명 |
+| `sourceRegion` | string 또는 null | provider 데이터 region. Basic FatSecret은 `US` |
+| response `query` | object 또는 null | 검색어 resolution metadata. 실제 번역 또는 미등록 한국어 alias처럼 query 처리가 달라진 경우 사용 |
+
+## Backend Provider 정책
+
+`FOOD_PROVIDER=mock`은 local mock 데이터를 반환한다.
+
+`FOOD_PROVIDER=fatsecret`은 FatSecret OAuth 2.0 client credentials로 access token을 발급받고, token 만료 전 refresh margin을 적용해 메모리 캐시를 갱신한다. Client ID, Client Secret, access token, FatSecret 원본 응답은 frontend 응답에 포함하지 않는다.
+
+FatSecret Basic은 `scope=basic`, basic search/detail API, US/en 데이터만 사용한다. `FATSECRET_REGION=KR`처럼 Basic에서 한국 시장을 요청하면 명확한 configuration error로 처리한다. Basic 검색에서 한글이 포함된 query는 provider 호출 전에 `backend/app/data/korean_food_aliases.json`의 작은 alias 사전으로 영어 검색어로 resolution한다. alias가 없으면 FatSecret에 임의 한국어 query를 보내지 않고 정상 빈 결과와 `query.status: "unresolved"` metadata를 반환한다. Basic 검색 envelope는 `foods.food`만 정상 결과로 읽고, serving 상세가 부족한 항목은 최대 `FATSECRET_DETAIL_CONCURRENCY` 개씩 concurrent `food.get.v2` fallback으로 보강한다.
+
+FatSecret Premier는 `scope=premier`, `foods.search.v5`, `food.get.v5`를 사용하고 `region`, `language`, `format=json`, `flag_default_serving=true`를 전달한다. Premier가 `region=KR`, `language=ko`로 구성되면 한국어 query를 번역하지 않고 원문 그대로 전달한다. frontend `page=1`은 FatSecret `page_number=0`으로 변환한다. Premier 검색 envelope는 `foods_search.results.food`만 정상 결과로 읽고, 검색 응답에 충분한 serving이 있는 항목은 상세 fallback을 호출하지 않는다.
+
+## Error Response
+
+Provider 오류는 다음 형태의 안전한 응답으로 내려간다. 비밀값, access token, 원본 provider 응답, 공인 IP 주소는 포함하지 않는다. FatSecret API error `code`는 숫자와 문자열 모두 처리하며 `20`은 temporary unavailable, `21`은 permission/configuration 계열 오류로 매핑한다.
+
+```json
+{
+  "detail": {
+    "code": "fatsecret_permission_error",
+    "message": "FatSecret API permissions are insufficient for this request."
+  }
+}
+```
+
+| 상황 | HTTP status |
+| --- | --- |
+| 잘못된 서버/provider 설정 | `503` |
+| 외부 인증/권한 문제 | `502` |
+| 외부 rate limit | `503` |
+| timeout/temporary unavailable | `503` |
+| invalid provider response | `502` |
+| 잘못된 query parameter | `422` |
 
 ## 타입 매핑 정책
 
@@ -81,13 +140,19 @@ mock fallback은 `backend-with-mock-fallback`을 명시했을 때만 동작한�
 
 | Backend DTO | Frontend `Food` |
 | --- | --- |
-| `id` | `id`, `sourceFoodId` |
+| `id` | `id` |
 | 고정값 없음 | `source: "backend-food-search"` |
+| `sourceFoodId` 또는 `id` | `sourceFoodId` |
+| `sourceFoodName` | `sourceFoodName` optional |
+| `sourceServingId` | `sourceServingId` optional |
+| `dataSource` | `dataSource` optional |
 | `name` | `name` |
 | `brandName` | `brandName` |
 | 없음 | `category: null` |
 | `servingSize` | `servingSize` |
 | `servingUnit` | `servingUnit` |
+| `servingDescription` | `servingDescription` optional |
+| `sourceRegion` | `sourceRegion` optional |
 | `nutritionPerServing.caloriesKcal` | `nutritionPerServing.caloriesKcal` |
 | `nutritionPerServing.proteinG` | `nutritionPerServing.proteinG` |
 | `nutritionPerServing.carbsG` | `nutritionPerServing.carbohydrateG` |
@@ -95,7 +160,3 @@ mock fallback은 `backend-with-mock-fallback`을 명시했을 때만 동작한�
 | 없음 | 당류, 나트륨, 식이섬유, 포화지방, 트랜스지방, 콜레스테롤은 `null` |
 
 실제 `0`과 정보 없음 `null`은 구분한다. adapter는 `0`을 결측값으로 바꾸지 않으며, 백엔드가 제공하지 않는 영양 필드만 `null`로 채운다.
-
-## 다음 단계: FatSecret 연동
-
-다음 단계에서 백엔드는 FatSecret OAuth 토큰 발급과 음식 검색 호출을 구현한다. Client Secret은 모바일 앱에 넣지 않고 백엔드 환경변수로만 관리한다. FatSecret 원본 응답은 백엔드 내부 adapter에서 현재 DTO 형태로 정규화한 뒤 프론트엔드에 반환한다.

@@ -22,6 +22,7 @@ const food: Food = {
   id: 'food-storage',
   source: 'test',
   sourceFoodId: 'food-storage',
+  sourceFoodName: 'Storage Food Source',
   name: 'storage food',
   brandName: null,
   category: null,
@@ -29,6 +30,10 @@ const food: Food = {
   servingUnit: 'g',
   nutritionPerServing: makeNutrition({ caloriesKcal: 100, proteinG: 10 }),
   updatedAt: timestamp,
+  dataSource: 'fatsecret',
+  sourceServingId: 'serving-storage',
+  servingDescription: '100 g',
+  sourceRegion: 'KR',
 };
 
 const meal: Meal = {

@@ -408,6 +408,11 @@ function parseFood(value: unknown): Food | null {
     ? null
     : parseFiniteNumber(value.servingSize);
   const nutritionPerServing = parseNutrition(value.nutritionPerServing);
+  const dataSource = parseOptionalFoodDataSource(value.dataSource);
+  const sourceFoodName = parseOptionalString(value.sourceFoodName);
+  const sourceServingId = parseOptionalString(value.sourceServingId);
+  const servingDescription = parseOptionalString(value.servingDescription);
+  const sourceRegion = parseOptionalString(value.sourceRegion);
 
   if (
     !isNonEmptyString(value.id)
@@ -420,6 +425,7 @@ function parseFood(value: unknown): Food | null {
     || !isNullableString(value.servingUnit)
     || nutritionPerServing === null
     || !isNonEmptyString(value.updatedAt)
+    || dataSource === null
   ) {
     return null;
   }
@@ -435,6 +441,11 @@ function parseFood(value: unknown): Food | null {
     servingUnit: value.servingUnit,
     nutritionPerServing,
     updatedAt: value.updatedAt,
+    ...(dataSource !== undefined ? { dataSource } : {}),
+    ...(sourceFoodName !== undefined ? { sourceFoodName } : {}),
+    ...(sourceServingId !== undefined ? { sourceServingId } : {}),
+    ...(servingDescription !== undefined ? { servingDescription } : {}),
+    ...(sourceRegion !== undefined ? { sourceRegion } : {}),
   };
 }
 
@@ -479,6 +490,16 @@ function parseOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+function parseOptionalFoodDataSource(value: unknown): Food['dataSource'] | null | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  return value === 'mock' || value === 'fatsecret'
+    ? value
+    : null;
+}
+
 function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string';
 }
@@ -494,4 +515,3 @@ function isMealType(value: unknown): value is Meal['type'] {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-

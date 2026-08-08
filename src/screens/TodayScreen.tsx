@@ -21,7 +21,7 @@ import {
   mealEvaluationStatusLabels,
 } from '../mealEvaluation';
 import type { MealEvaluationResult } from '../mealEvaluation';
-import type { Food, Meal, MealFood, MealType } from '../models';
+import type { Food, FoodSearchQueryMetadata, Meal, MealFood, MealType } from '../models';
 import {
   buildDailySummary,
   calculateNutritionForConsumedGrams,
@@ -84,6 +84,7 @@ export function TodayScreen({
   const currentToday = getLocalDateString();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodSearchResult[]>([]);
+  const [searchQueryMetadata, setSearchQueryMetadata] = useState<FoodSearchQueryMetadata | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -140,6 +141,7 @@ export function TodayScreen({
   const resetFoodSearchState = () => {
     setSearchQuery('');
     setSearchResults([]);
+    setSearchQueryMetadata(null);
     setHasSearched(false);
     setIsSearching(false);
     setSearchError(null);
@@ -181,6 +183,7 @@ export function TodayScreen({
       setIsSearching(false);
       setSearchError(null);
       setSearchResults([]);
+      setSearchQueryMetadata(null);
       return;
     }
 
@@ -191,13 +194,16 @@ export function TodayScreen({
           setIsSearching(true);
           setSearchError(null);
           setSearchResults([]);
+          setSearchQueryMetadata(null);
         },
-        onSuccess: (results) => {
+        onSuccess: (results, queryMetadata) => {
           setSearchResults(results);
+          setSearchQueryMetadata(queryMetadata ?? null);
         },
         onError: (message) => {
           setSearchError(message);
           setSearchResults([]);
+          setSearchQueryMetadata(null);
         },
         onFinish: () => {
           setIsSearching(false);
@@ -442,6 +448,7 @@ export function TodayScreen({
                     onQueryChange={setSearchQuery}
                     onSelectFood={(food) => openPortionModal(food, meal.type)}
                     query={searchQuery}
+                    queryMetadata={searchQueryMetadata}
                     results={searchResults}
                     searchError={searchError}
                   />

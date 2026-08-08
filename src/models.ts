@@ -1,5 +1,17 @@
 export type MealType = 'breakfast' | 'lunch' | 'dinner';
 
+export type FoodDataSource = 'mock' | 'fatsecret';
+
+export type FoodSearchQueryStatus = 'identity' | 'translated' | 'unresolved';
+
+export type FoodSearchQueryMetadata = {
+  original: string;
+  resolved: string;
+  wasTranslated: boolean;
+  translator?: string;
+  status?: FoodSearchQueryStatus;
+};
+
 export type Nutrition = {
   caloriesKcal: number | null;
   carbohydrateG: number | null;
@@ -17,6 +29,7 @@ export type Food = {
   id: string;
   source: string;
   sourceFoodId: string;
+  sourceFoodName?: string;
   name: string;
   brandName: string | null;
   category: string | null;
@@ -24,6 +37,10 @@ export type Food = {
   servingUnit: string | null;
   nutritionPerServing: Nutrition;
   updatedAt: string;
+  dataSource?: FoodDataSource;
+  sourceServingId?: string;
+  servingDescription?: string;
+  sourceRegion?: string;
 };
 
 export type MealFood = {

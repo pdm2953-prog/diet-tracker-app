@@ -1,11 +1,13 @@
 import {
   FOOD_SEARCH_CONNECTION_ERROR_MESSAGE,
+  searchFoodProviderWithMetadata,
 } from './foodSearch';
 import type {
   FoodSearchOptions,
   FoodSearchProvider,
   FoodSearchResult,
 } from './foodSearch';
+import type { FoodSearchQueryMetadata } from '../models';
 import { isAbortError } from './abortError';
 
 export const FOOD_SEARCH_DEBOUNCE_MS = 350;
@@ -18,7 +20,7 @@ export type FoodSearchRequestGate = {
 
 export type FoodSearchRequestCallbacks = {
   onStart: () => void;
-  onSuccess: (results: FoodSearchResult[]) => void;
+  onSuccess: (results: FoodSearchResult[], query?: FoodSearchQueryMetadata) => void;
   onError: (message: string) => void;
   onFinish: () => void;
 };
@@ -28,6 +30,7 @@ export type FoodSearchRequestResult =
       applied: boolean;
       status: 'success';
       results: FoodSearchResult[];
+      query?: FoodSearchQueryMetadata;
     }
   | {
       applied: boolean;
@@ -77,22 +80,29 @@ export async function runFoodSearchRequest(params: {
   params.callbacks.onStart();
 
   try {
-    const results = await params.provider.searchFoods(params.query, params.options);
+    const providerResponse = await searchFoodProviderWithMetadata(
+      params.provider,
+      params.query,
+      params.options,
+    );
+    const results = providerResponse.results;
 
     if (!params.gate.isLatest(requestId)) {
       return {
         applied: false,
         status: 'success',
         results,
+        ...(providerResponse.query !== undefined ? { query: providerResponse.query } : {}),
       };
     }
 
-    params.callbacks.onSuccess(results);
+    params.callbacks.onSuccess(results, providerResponse.query);
 
     return {
       applied: true,
       status: 'success',
       results,
+      ...(providerResponse.query !== undefined ? { query: providerResponse.query } : {}),
     };
   } catch (error) {
     if (isAbortError(error) || params.options?.signal?.aborted) {
