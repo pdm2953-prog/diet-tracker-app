@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-FoodDataSource = Literal["mock", "fatsecret"]
+FoodDataSource = str
 FoodSearchQueryStatus = Literal["identity", "translated", "unresolved"]
 
 

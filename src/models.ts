@@ -1,6 +1,7 @@
 export type MealType = 'breakfast' | 'lunch' | 'dinner';
 
-export type FoodDataSource = 'mock' | 'fatsecret';
+export type KnownFoodDataSource = 'mock' | 'fatsecret';
+export type FoodDataSource = KnownFoodDataSource | (string & Record<never, never>);
 
 export type FoodSearchQueryStatus = 'identity' | 'translated' | 'unresolved';
 

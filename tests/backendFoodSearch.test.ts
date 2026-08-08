@@ -7,6 +7,7 @@ import {
 } from '../src/services/backendFoodAdapter';
 import { createAbortError } from '../src/services/abortError';
 import { searchBackendFoods } from '../src/services/backendFoodSearch';
+import { formatFoodDataSourceLabel } from '../src/utils/foodDataSource';
 import {
   createBackendServiceConfig,
   DEFAULT_BACKEND_URL,
@@ -48,6 +49,7 @@ const backendFoodDto = {
   id: 'mock-chicken-breast',
   name: '닭가슴살',
   displayName: '닭가슴살',
+  dataSource: 'mock',
   brandName: null,
   sourceFoodName: '닭가슴살',
   servingSize: 100,
@@ -91,6 +93,7 @@ test('adaptBackendFoodSearchItem maps backend DTO to Food and preserves zero val
   assert.equal(food.sourceFoodId, 'mock-chicken-breast');
   assert.equal(food.sourceFoodName, '닭가슴살');
   assert.equal(food.displayName, '닭가슴살');
+  assert.equal(food.dataSource, 'mock');
   assert.equal(food.brandName, null);
   assert.equal(food.category, null);
   assert.equal(food.nutritionPerServing.carbohydrateG, 0);
@@ -131,6 +134,61 @@ test('adaptBackendFoodSearchItem safely maps optional FatSecret metadata', () =>
   assert.equal(food.servingSize, 100);
   assert.equal(food.servingUnit, 'g');
   assert.equal(food.nutritionPerServing.carbohydrateG, 0);
+});
+
+test('parseBackendFoodSearchResponse preserves extensible backend dataSource values', () => {
+  const dataSources = ['database', 'curated', 'future-provider.v2'];
+
+  for (const dataSource of dataSources) {
+    const parsedResponse = parseBackendFoodSearchResponse({
+      items: [{ ...backendFoodDto, dataSource }],
+      page: 1,
+      pageSize: 20,
+      hasMore: false,
+    });
+
+    const parsedItem = parsedResponse?.items[0];
+    assert.equal(parsedItem !== undefined, true);
+
+    if (parsedItem !== undefined) {
+      assert.equal(parsedItem.dataSource, dataSource);
+      assert.equal(adaptBackendFoodSearchItem(parsedItem).dataSource, dataSource);
+    }
+  }
+});
+
+test('parseBackendFoodSearchResponse omits malformed dataSource without rejecting the item', () => {
+  const malformedDataSources = ['', '   ', null, 123, false, { provider: 'database' }];
+
+  for (const dataSource of malformedDataSources) {
+    const parsedResponse = parseBackendFoodSearchResponse({
+      items: [{ ...backendFoodDto, dataSource }],
+      page: 1,
+      pageSize: 20,
+      hasMore: false,
+    });
+
+    const parsedItem = parsedResponse?.items[0];
+    assert.equal(parsedItem !== undefined, true);
+
+    if (parsedItem !== undefined) {
+      assert.equal(parsedItem.dataSource, undefined);
+      assert.equal(adaptBackendFoodSearchItem(parsedItem).dataSource, undefined);
+    }
+  }
+});
+
+test('formatFoodDataSourceLabel resolves known and unknown source labels safely', () => {
+  assert.equal(formatFoodDataSourceLabel('mock'), '개발 데이터');
+  assert.equal(formatFoodDataSourceLabel('fatsecret'), '외부 영양 데이터');
+  assert.equal(formatFoodDataSourceLabel('database'), '데이터 출처');
+  assert.equal(formatFoodDataSourceLabel('curated'), '데이터 출처');
+  assert.equal(formatFoodDataSourceLabel('future-provider-v2'), '데이터 출처');
+  assert.equal(formatFoodDataSourceLabel('toString'), '데이터 출처');
+  assert.equal(formatFoodDataSourceLabel('constructor'), '데이터 출처');
+  assert.equal(formatFoodDataSourceLabel('__proto__'), '데이터 출처');
+  assert.equal(formatFoodDataSourceLabel(''), null);
+  assert.equal(formatFoodDataSourceLabel(undefined), null);
 });
 
 test('searchBackendFoods calls foods search API with q and adapts one backend item', async () => {

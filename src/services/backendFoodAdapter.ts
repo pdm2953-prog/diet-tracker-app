@@ -4,6 +4,7 @@ import type {
   FoodSearchQueryMetadata,
   FoodSearchQueryStatus,
 } from '../models';
+import { parseOptionalFoodDataSource } from '../utils/foodDataSource';
 
 export type BackendFoodNutritionPerServingDto = {
   caloriesKcal: number | null;
@@ -169,7 +170,7 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
 
   const servingSize = parseNullableNonNegativeNumber(value.servingSize);
   const nutritionPerServing = parseBackendFoodNutrition(value.nutritionPerServing);
-  const dataSource = parseOptionalDataSource(value.dataSource);
+  const dataSource = parseOptionalFoodDataSource(value.dataSource);
   const displayName = parseOptionalString(value.displayName);
   const sourceFoodId = parseOptionalString(value.sourceFoodId);
   const sourceFoodName = parseOptionalString(value.sourceFoodName);
@@ -187,7 +188,6 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
     || servingSize === undefined
     || !isNullableString(value.servingUnit)
     || nutritionPerServing === null
-    || dataSource === null
     || displayName === null
     || sourceFoodId === null
     || sourceFoodName === null
@@ -305,16 +305,6 @@ function parseOptionalBoolean(value: unknown): boolean | undefined | null {
   }
 
   return typeof value === 'boolean'
-    ? value
-    : null;
-}
-
-function parseOptionalDataSource(value: unknown): FoodDataSource | undefined | null {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-
-  return value === 'mock' || value === 'fatsecret'
     ? value
     : null;
 }

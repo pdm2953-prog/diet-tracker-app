@@ -2,7 +2,7 @@ import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 
 import { colors, mealLabels } from '../constants';
 import { hasValidGramServing } from '../meals';
-import type { FoodDataSource, FoodSearchQueryMetadata, MealType } from '../models';
+import type { FoodSearchQueryMetadata, MealType } from '../models';
 import {
   formatNutritionValue,
   nutritionLabels,
@@ -11,6 +11,7 @@ import {
 import type { FoodSearchResult } from '../services/foodSearch';
 import { styles } from '../styles';
 import { formatServingText } from '../utils/format';
+import { formatFoodDataSourceLabel } from '../utils/foodDataSource';
 import {
   getDevelopmentSourceFoodName,
   getFoodDisplayName,
@@ -157,7 +158,9 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
   const missingPrimaryFields = getMissingPrimaryFields(food.nutritionPerServing);
   const canAddFood = hasValidGramServing(food);
   const macroFields = primaryNutritionFields.filter((field) => field !== 'caloriesKcal');
-  const dataSourceLabel = formatDataSourceLabel(food.dataSource);
+  const dataSourceLabel = isDevelopmentMode()
+    ? formatFoodDataSourceLabel(food.dataSource)
+    : null;
   const foodDisplayName = getFoodDisplayName(food);
   const sourceFoodName = getDevelopmentSourceFoodName(food);
 
@@ -167,7 +170,7 @@ function FoodSearchResultCard({ food, onSelectFood }: FoodSearchResultCardProps)
         <View style={styles.searchResultTitleBlock}>
           <View style={styles.searchResultStatusRow}>
             <Text style={styles.searchResultName}>{foodDisplayName}</Text>
-            {shouldShowDataSourceBadge(food.dataSource) && dataSourceLabel !== null ? (
+            {dataSourceLabel !== null ? (
               <StatusBadge icon="i" label={dataSourceLabel} tone="info" />
             ) : null}
             {!canAddFood ? (
@@ -240,21 +243,4 @@ function shouldShowQueryDebug(query: FoodSearchQueryMetadata | null): query is F
     && query !== null
     && query.wasTranslated
     && query.original !== query.resolved;
-}
-
-function shouldShowDataSourceBadge(dataSource: FoodDataSource | undefined): boolean {
-  return isDevelopmentMode() && dataSource !== undefined;
-}
-
-
-function formatDataSourceLabel(dataSource: FoodDataSource | undefined): string | null {
-  if (dataSource === 'mock') {
-    return 'Mock 데이터';
-  }
-
-  if (dataSource === 'fatsecret') {
-    return 'FatSecret';
-  }
-
-  return null;
 }

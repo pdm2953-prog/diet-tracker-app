@@ -11,6 +11,7 @@ import { mealTypes } from './meals';
 import { dailyTargets } from './nutrition';
 import type { DailyNutritionTargets } from './nutrition';
 import { isValidLocalDateString } from './utils/date';
+import { parseOptionalFoodDataSource } from './utils/foodDataSource';
 
 export type AppDataSnapshot = {
   fixedMealTemplates: FixedMealTemplate[];
@@ -429,7 +430,6 @@ function parseFood(value: unknown): Food | null {
     || !isNullableString(value.servingUnit)
     || nutritionPerServing === null
     || !isNonEmptyString(value.updatedAt)
-    || dataSource === null
     || displayName === null
     || wasLocalized === null
     || displayLocale === null
@@ -512,15 +512,6 @@ function parseOptionalBoolean(value: unknown): boolean | null | undefined {
     : null;
 }
 
-function parseOptionalFoodDataSource(value: unknown): Food['dataSource'] | null | undefined {
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-
-  return value === 'mock' || value === 'fatsecret'
-    ? value
-    : null;
-}
 
 function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string';

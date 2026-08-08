@@ -110,6 +110,67 @@ test('restoreAppDataSnapshot round-trips valid versioned local data', () => {
   assert.deepEqual(restoreAppDataSnapshot(serializeAppDataSnapshot(data), fallback), data);
 });
 
+test('restoreAppDataSnapshot preserves future dataSource values without dropping foods or meal rows', () => {
+  const futureFood: Food = {
+    ...food,
+    id: 'food-database',
+    sourceFoodId: 'database-food-1',
+    dataSource: 'database',
+  };
+  const futureMeal: Meal = {
+    ...meal,
+    foods: [{
+      ...meal.foods[0],
+      id: 'meal-food-database',
+      foodId: futureFood.id,
+    }],
+  };
+  const data: AppDataSnapshot = {
+    fixedMealTemplates: [],
+    foods: [futureFood],
+    hiddenFixedMealSourceKeys: {},
+    mealsByDate: { '2026-07-23': [futureMeal] },
+    todayTargets: fallback.todayTargets,
+  };
+
+  const restored = restoreAppDataSnapshot(serializeAppDataSnapshot(data), fallback);
+
+  assert.equal(restored.foods.length, 1);
+  assert.equal(restored.foods[0]?.id, 'food-database');
+  assert.equal(restored.foods[0]?.dataSource, 'database');
+  assert.equal(restored.mealsByDate['2026-07-23']?.[0]?.foods[0]?.foodId, 'food-database');
+});
+
+test('restoreAppDataSnapshot omits malformed dataSource without dropping stored foods or meals', () => {
+  const malformedFood = {
+    ...food,
+    id: 'food-malformed-source',
+    dataSource: 123,
+  };
+  const malformedMeal = {
+    ...meal,
+    foods: [{
+      ...meal.foods[0],
+      id: 'meal-food-malformed-source',
+      foodId: malformedFood.id,
+    }],
+  };
+  const rawValue = JSON.stringify({
+    version: 1,
+    fixedMealTemplates: [],
+    foods: [malformedFood],
+    hiddenFixedMealSourceKeys: {},
+    mealsByDate: { '2026-07-23': [malformedMeal] },
+    todayTargets: fallback.todayTargets,
+  });
+
+  const restored = restoreAppDataSnapshot(rawValue, fallback);
+
+  assert.equal(restored.foods.length, 1);
+  assert.equal(restored.foods[0]?.id, 'food-malformed-source');
+  assert.equal(restored.foods[0]?.dataSource, undefined);
+  assert.equal(restored.mealsByDate['2026-07-23']?.[0]?.foods[0]?.foodId, 'food-malformed-source');
+});
 test('restoreAppDataSnapshot falls back for invalid JSON and unsupported versions', () => {
   assert.equal(restoreAppDataSnapshot('{bad json', fallback), fallback);
   assert.equal(restoreAppDataSnapshot(JSON.stringify({ version: 999 }), fallback), fallback);

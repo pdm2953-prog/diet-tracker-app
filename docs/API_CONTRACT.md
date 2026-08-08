@@ -88,13 +88,15 @@ mock fallback은 `backend-with-mock-fallback`을 명시했을 때만 동작한�
 
 검색 결과가 없으면 `200`과 함께 `items: []`, `hasMore: false`를 반환한다. 외부 provider 인증, 권한, rate limit, timeout, invalid response는 검색 결과 없음으로 변환하지 않고 오류 상태 코드로 반환한다.
 
+`dataSource`는 디버그와 출처 추적을 위한 metadata이며 안정적인 provider 분기 API가 아니다. frontend는 알 수 없는 non-empty string 값을 보존해야 하고, 새로운 source 값이 추가되어도 음식 검색/식단 저장 흐름을 실패시키면 안 된다. 더 큰 API 정리에서는 stable source category와 optional sourceProvider를 별도 필드로 분리할 수 있다.
+
 ### Optional metadata
 
 기존 frontend 계약을 깨지 않기 위해 다음 필드는 optional이다.
 
 | 필드 | 값 | 설명 |
 | --- | --- | --- |
-| `dataSource` | `mock` 또는 `fatsecret` | 개발 중 provider 출처 확인용 |
+| `dataSource` | non-empty string | 출처 metadata. 현재 `mock`, `fatsecret` 값을 반환할 수 있으며 향후 `database`, `curated`, `user` 같은 값이 추가될 수 있다. frontend business logic은 이 값을 폐쇄 provider enum으로 취급하지 않는다. |
 | `sourceFoodId` | string | 원천 provider의 food id |
 | `sourceFoodName` | string | 원천 provider가 반환한 원본 음식명. 자체 DB migration 시 출처 추적용 |
 | `sourceServingId` | string 또는 null | 원천 provider의 serving id |
