@@ -1,7 +1,22 @@
-export type MealType = 'breakfast' | 'lunch' | 'dinner';
+﻿export type MealType = 'breakfast' | 'lunch' | 'dinner';
 
 export type KnownFoodDataSource = 'mock' | 'fatsecret';
 export type FoodDataSource = KnownFoodDataSource | (string & Record<never, never>);
+
+export type NutritionSourceMetadata = {
+  type: string;
+  name: string;
+  url: string | null;
+  recordId: string | null;
+  checkedAt: string;
+};
+
+export type NutritionVerificationStatus =
+  | 'official'
+  | 'reviewed'
+  | 'estimated'
+  | 'needs_verification'
+  | (string & Record<never, never>);
 
 export type FoodSearchQueryStatus = 'identity' | 'translated' | 'unresolved';
 
@@ -33,6 +48,8 @@ export type Food = {
   sourceFoodName?: string;
   name: string;
   displayName?: string;
+  catalogId?: string;
+  canonicalName?: string;
   brandName: string | null;
   category: string | null;
   servingSize: number | null;
@@ -46,6 +63,8 @@ export type Food = {
   wasLocalized?: boolean;
   displayLocale?: string;
   localizer?: string;
+  nutritionSource?: NutritionSourceMetadata;
+  verificationStatus?: NutritionVerificationStatus;
 };
 
 export type MealFood = {

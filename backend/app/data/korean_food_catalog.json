@@ -1,0 +1,375 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "kr-bhc-bburinkle",
+      "canonicalName": "뿌링클",
+      "brandName": "BHC",
+      "category": "치킨",
+      "aliases": [
+        "뿌링클",
+        "BHC 뿌링클",
+        "bhc 뿌링클",
+        "비에이치씨 뿌링클"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-bhc-kwasakking",
+      "canonicalName": "콰삭킹",
+      "brandName": "BHC",
+      "category": "치킨",
+      "aliases": [
+        "콰삭킹",
+        "BHC 콰삭킹",
+        "bhc 콰삭킹",
+        "비에이치씨 콰삭킹"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-bhc-macho-king",
+      "canonicalName": "맛초킹",
+      "brandName": "BHC",
+      "category": "치킨",
+      "aliases": [
+        "맛초킹",
+        "BHC 맛초킹",
+        "bhc 맛초킹",
+        "비에이치씨 맛초킹"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-kyochon-honey-combo",
+      "canonicalName": "허니콤보",
+      "brandName": "교촌",
+      "category": "치킨",
+      "aliases": [
+        "허니콤보",
+        "교촌 허니콤보",
+        "교촌치킨 허니콤보"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-goobne-gochubasasak",
+      "canonicalName": "고추바사삭",
+      "brandName": "굽네",
+      "category": "치킨",
+      "aliases": [
+        "고추바사삭",
+        "굽네 고추바사삭",
+        "굽네치킨 고추바사삭"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-zigova-charcoal-yangnyeom-chicken",
+      "canonicalName": "숯불양념치킨",
+      "brandName": "지코바",
+      "category": "치킨",
+      "aliases": [
+        "숯불양념치킨",
+        "지코바 숯불양념치킨",
+        "지코바 양념치킨"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-dongdaemun-yeopgi-tteokbokki",
+      "canonicalName": "엽기떡볶이",
+      "brandName": "동대문엽기떡볶이",
+      "category": "분식",
+      "aliases": [
+        "엽떡",
+        "엽기떡볶이",
+        "동대문엽기떡볶이",
+        "동대문엽기떡볶이 엽기떡볶이"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-kimchi-jjigae",
+      "canonicalName": "김치찌개",
+      "brandName": null,
+      "category": "찌개",
+      "aliases": [
+        "김치찌개",
+        "김치 찌개"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "kimchi stew"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-doenjang-jjigae",
+      "canonicalName": "된장찌개",
+      "brandName": null,
+      "category": "찌개",
+      "aliases": [
+        "된장찌개",
+        "된장 찌개"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "doenjang jjigae"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-soondubu-jjigae",
+      "canonicalName": "순두부찌개",
+      "brandName": null,
+      "category": "찌개",
+      "aliases": [
+        "순두부찌개",
+        "순두부 찌개"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "soondubu jjigae"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-budae-jjigae",
+      "canonicalName": "부대찌개",
+      "brandName": null,
+      "category": "찌개",
+      "aliases": [
+        "부대찌개",
+        "부대 찌개"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "budae jjigae"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-jeyuk-bokkeum",
+      "canonicalName": "제육볶음",
+      "brandName": null,
+      "category": "한식",
+      "aliases": [
+        "제육볶음",
+        "제육 볶음"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "jeyuk bokkeum"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-bulgogi",
+      "canonicalName": "불고기",
+      "brandName": null,
+      "category": "한식",
+      "aliases": [
+        "불고기"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "bulgogi"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-bibimbap",
+      "canonicalName": "비빔밥",
+      "brandName": null,
+      "category": "밥류",
+      "aliases": [
+        "비빔밥"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "bibimbap"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-kimchi-fried-rice",
+      "canonicalName": "김치볶음밥",
+      "brandName": null,
+      "category": "밥류",
+      "aliases": [
+        "김치볶음밥",
+        "김치 볶음밥"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "kimchi fried rice"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-tteokbokki",
+      "canonicalName": "떡볶이",
+      "brandName": null,
+      "category": "분식",
+      "aliases": [
+        "떡볶이"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "tteokbokki"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-soondae",
+      "canonicalName": "순대",
+      "brandName": null,
+      "category": "분식",
+      "aliases": [
+        "순대"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "soondae"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-gimbap",
+      "canonicalName": "김밥",
+      "brandName": null,
+      "category": "분식",
+      "aliases": [
+        "김밥"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "gimbap"
+          ]
+        }
+      ]
+    }
+  ]
+}

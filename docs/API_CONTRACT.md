@@ -1,8 +1,8 @@
-# API Contract
+﻿# API Contract
 
 이 문서는 Expo React Native 앱과 FastAPI 백엔드 사이의 음식 검색 계약을 정의한다.
 
-프론트엔드는 FatSecret을 직접 호출하지 않는다. 음식 검색은 항상 FastAPI의 `/api/v1/foods/search`를 호출하고, 백엔드는 `FOOD_PROVIDER` 설정에 따라 `mock` 또는 `fatsecret` provider를 선택한다.
+프론트엔드는 FatSecret을 직접 호출하지 않는다. 음식 검색은 항상 FastAPI의 `/api/v1/foods/search`를 호출하고, 백엔드는 `FOOD_PROVIDER` 설정에 따라 `mock` 또는 `fatsecret` provider를 선택한다. 한국 음식명은 backend의 `KoreanFoodCatalog`에서 먼저 identity와 provider ref를 resolve하며, 영문 provider search term과 catalog routing 정보는 frontend contract에 포함하지 않는다.
 
 ## Base URL
 
@@ -56,7 +56,11 @@ mock fallback은 `backend-with-mock-fallback`을 명시했을 때만 동작한�
     {
       "id": "fatsecret-123-456",
       "name": "Chicken Breast",
+      "displayName": "닭가슴살",
       "brandName": null,
+      "category": null,
+      "catalogId": null,
+      "canonicalName": null,
       "servingSize": 100,
       "servingUnit": "g",
       "nutritionPerServing": {
@@ -70,7 +74,9 @@ mock fallback은 `backend-with-mock-fallback`을 명시했을 때만 동작한�
       "sourceFoodName": "Chicken Breast",
       "sourceServingId": "456",
       "servingDescription": "100 g",
-      "sourceRegion": "US"
+      "sourceRegion": "US",
+      "nutritionSource": null,
+      "verificationStatus": null
     }
   ],
   "page": 1,
@@ -96,12 +102,18 @@ mock fallback은 `backend-with-mock-fallback`을 명시했을 때만 동작한�
 
 | 필드 | 값 | 설명 |
 | --- | --- | --- |
+| `displayName` | string 또는 null | 사용자 표시용 음식명. catalog canonical name 또는 `FoodNameLocalizer` 결과를 사용할 수 있다. |
+| `category` | string 또는 null | provider-neutral 음식 분류. catalog hit이면 catalog category를 반환할 수 있다. |
+| `catalogId` | string 또는 null | `KoreanFoodCatalog` item id. 외부 provider routing id가 아니다. |
+| `canonicalName` | string 또는 null | catalog canonical Korean name. |
 | `dataSource` | non-empty string | 출처 metadata. 현재 `mock`, `fatsecret` 값을 반환할 수 있으며 향후 `database`, `curated`, `user` 같은 값이 추가될 수 있다. frontend business logic은 이 값을 폐쇄 provider enum으로 취급하지 않는다. |
 | `sourceFoodId` | string | 원천 provider의 food id |
 | `sourceFoodName` | string | 원천 provider가 반환한 원본 음식명. 자체 DB migration 시 출처 추적용 |
 | `sourceServingId` | string 또는 null | 원천 provider의 serving id |
 | `servingDescription` | string 또는 null | 원천 provider의 serving 설명 |
 | `sourceRegion` | string 또는 null | provider 데이터 region. Basic FatSecret은 `US` |
+| `nutritionSource` | object 또는 null | `curated_nutrition` 결과의 provider-neutral 출처 metadata. FatSecret credential이나 externalRefs는 포함하지 않음 |
+| `verificationStatus` | string 또는 null | `official`, `reviewed`, `estimated`, `needs_verification` 같은 curated nutrition 검증 상태 |
 | response `query` | object 또는 null | 검색어 resolution metadata. 실제 번역 또는 미등록 한국어 alias처럼 query 처리가 달라진 경우 사용 |
 
 ## Backend Provider 정책
@@ -110,7 +122,7 @@ mock fallback은 `backend-with-mock-fallback`을 명시했을 때만 동작한�
 
 `FOOD_PROVIDER=fatsecret`은 FatSecret OAuth 2.0 client credentials로 access token을 발급받고, token 만료 전 refresh margin을 적용해 메모리 캐시를 갱신한다. Client ID, Client Secret, access token, FatSecret 원본 응답은 frontend 응답에 포함하지 않는다.
 
-FatSecret Basic은 `scope=basic`, basic search/detail API, US/en 데이터만 사용한다. `FATSECRET_REGION=KR`처럼 Basic에서 한국 시장을 요청하면 명확한 configuration error로 처리한다. Basic 검색에서 한글이 포함된 query는 provider 호출 전에 `backend/app/data/korean_food_aliases.json`의 작은 alias 사전으로 영어 검색어로 resolution한다. alias가 없으면 FatSecret에 임의 한국어 query를 보내지 않고 정상 빈 결과와 `query.status: "unresolved"` metadata를 반환한다. Basic 검색 envelope는 `foods.food`만 정상 결과로 읽고, serving 상세가 부족한 항목은 최대 `FATSECRET_DETAIL_CONCURRENCY` 개씩 concurrent `food.get.v2` fallback으로 보강한다.
+FatSecret Basic은 `scope=basic`, basic search/detail API, US/en 데이터만 사용한다. `FATSECRET_REGION=KR`처럼 Basic에서 한국 시장을 요청하면 명확한 configuration error로 처리한다. Basic 검색에서 한글이 포함된 query는 먼저 `KoreanFoodCatalog`로 exact alias/canonical/brand+food resolution을 시도한다. Catalog item이 `curated_nutrition`이고 `official/reviewed` nutrition을 가지고 있으면 catalog nutrition을 반환한다. `external_id` item이 검증된 `sourceFoodId`를 가지고 있으면 `food.get` direct lookup을 우선한다. `provider_search` item은 검증된 searchTerms로 provider search를 사용한다. Catalog hit이지만 nutrition/link가 아직 검증되지 않았으면 잘못된 외부 후보를 자동 선택하지 않고 빈 결과를 반환한다. Catalog miss일 때만 `backend/app/data/korean_food_aliases.json`의 작은 alias 사전으로 generic query translation을 수행한다. alias도 없으면 FatSecret에 임의 한국어 query를 보내지 않고 정상 빈 결과와 `query.status: "unresolved"` metadata를 반환한다. Catalog provider search term과 externalRefs는 frontend 응답에 노출하지 않는다. Basic 검색 envelope는 `foods.food`만 정상 결과로 읽고, serving 상세가 부족한 항목은 최대 `FATSECRET_DETAIL_CONCURRENCY` 개씩 concurrent `food.get.v2` fallback으로 보강한다.
 
 FatSecret Premier는 `scope=premier`, `foods.search.v5`, `food.get.v5`를 사용하고 `region`, `language`, `format=json`, `flag_default_serving=true`를 전달한다. Premier가 `region=KR`, `language=ko`로 구성되면 한국어 query를 번역하지 않고 원문 그대로 전달한다. frontend `page=1`은 FatSecret `page_number=0`으로 변환한다. Premier 검색 envelope는 `foods_search.results.food`만 정상 결과로 읽고, 검색 응답에 충분한 serving이 있는 항목은 상세 fallback을 호출하지 않는다.
 
@@ -150,11 +162,13 @@ Provider 오류는 다음 형태의 안전한 응답으로 내려간다. 비밀�
 | `dataSource` | `dataSource` optional |
 | `name` | `name` |
 | `brandName` | `brandName` |
-| 없음 | `category: null` |
+| `category` 또는 없음 | `category` 또는 `null` |
 | `servingSize` | `servingSize` |
 | `servingUnit` | `servingUnit` |
 | `servingDescription` | `servingDescription` optional |
 | `sourceRegion` | `sourceRegion` optional |
+| `nutritionSource` | `nutritionSource` optional |
+| `verificationStatus` | `verificationStatus` optional |
 | `nutritionPerServing.caloriesKcal` | `nutritionPerServing.caloriesKcal` |
 | `nutritionPerServing.proteinG` | `nutritionPerServing.proteinG` |
 | `nutritionPerServing.carbsG` | `nutritionPerServing.carbohydrateG` |

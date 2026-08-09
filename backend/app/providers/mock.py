@@ -126,7 +126,11 @@ class MockFoodProvider:
             has_more=end_index < len(matching_foods),
         )
 
-    async def get_food(self, food_id: str) -> FoodSearchRecord | None:
+    async def get_food(
+        self,
+        food_id: str,
+        serving_id: str | None = None,
+    ) -> FoodSearchRecord | None:
         normalized_food_id = food_id.strip()
 
         for food in MOCK_FOODS:

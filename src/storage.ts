@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   FixedMealTemplate,
   Food,
   HiddenFixedMealSourceKeysByDate,
@@ -411,6 +411,8 @@ function parseFood(value: unknown): Food | null {
   const nutritionPerServing = parseNutrition(value.nutritionPerServing);
   const dataSource = parseOptionalFoodDataSource(value.dataSource);
   const displayName = parseOptionalString(value.displayName);
+  const catalogId = parseOptionalString(value.catalogId);
+  const canonicalName = parseOptionalString(value.canonicalName);
   const sourceFoodName = parseOptionalString(value.sourceFoodName);
   const sourceServingId = parseOptionalString(value.sourceServingId);
   const servingDescription = parseOptionalString(value.servingDescription);
@@ -418,6 +420,8 @@ function parseFood(value: unknown): Food | null {
   const wasLocalized = parseOptionalBoolean(value.wasLocalized);
   const displayLocale = parseOptionalString(value.displayLocale);
   const localizer = parseOptionalString(value.localizer);
+  const nutritionSource = parseOptionalNutritionSource(value.nutritionSource);
+  const verificationStatus = parseOptionalString(value.verificationStatus);
 
   if (
     !isNonEmptyString(value.id)
@@ -434,6 +438,8 @@ function parseFood(value: unknown): Food | null {
     || wasLocalized === null
     || displayLocale === null
     || localizer === null
+    || nutritionSource === null
+    || verificationStatus === null
   ) {
     return null;
   }
@@ -444,6 +450,8 @@ function parseFood(value: unknown): Food | null {
     sourceFoodId: value.sourceFoodId,
     name: value.name,
     ...(displayName !== undefined ? { displayName } : {}),
+    ...(catalogId !== undefined ? { catalogId } : {}),
+    ...(canonicalName !== undefined ? { canonicalName } : {}),
     brandName: value.brandName,
     category: value.category,
     servingSize,
@@ -458,6 +466,39 @@ function parseFood(value: unknown): Food | null {
     ...(wasLocalized !== undefined ? { wasLocalized } : {}),
     ...(displayLocale !== undefined ? { displayLocale } : {}),
     ...(localizer !== undefined ? { localizer } : {}),
+    ...(nutritionSource !== undefined ? { nutritionSource } : {}),
+    ...(verificationStatus !== undefined ? { verificationStatus } : {}),
+  };
+}
+
+function parseOptionalNutritionSource(value: unknown): Food['nutritionSource'] | undefined | null {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const url = parseNullableStringField(value.url);
+  const recordId = parseNullableStringField(value.recordId);
+
+  if (
+    !isNonEmptyString(value.type)
+    || !isNonEmptyString(value.name)
+    || url === undefined
+    || recordId === undefined
+    || !isNonEmptyString(value.checkedAt)
+  ) {
+    return null;
+  }
+
+  return {
+    type: value.type,
+    name: value.name,
+    url,
+    recordId,
+    checkedAt: value.checkedAt,
   };
 }
 
@@ -500,6 +541,16 @@ function parseFiniteNumber(value: unknown): number | null {
 
 function parseOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function parseNullableStringField(value: unknown): string | null | undefined {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  return typeof value === 'string'
+    ? value
+    : undefined;
 }
 
 function parseOptionalBoolean(value: unknown): boolean | null | undefined {

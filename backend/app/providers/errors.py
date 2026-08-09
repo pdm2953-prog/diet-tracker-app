@@ -3,9 +3,24 @@ class FoodProviderError(Exception):
     public_message = "Food provider is unavailable."
     status_code = 503
 
-    def __init__(self, public_message: str | None = None) -> None:
+    def __init__(
+        self,
+        public_message: str | None = None,
+        *,
+        provider_error_code: str | None = None,
+        provider_error_type: str | None = None,
+        operation: str | None = None,
+        api_edition: str | None = None,
+        api_method: str | None = None,
+    ) -> None:
         if public_message is not None:
             self.public_message = public_message
+
+        self.provider_error_code = provider_error_code
+        self.provider_error_type = provider_error_type
+        self.operation = operation
+        self.api_edition = api_edition
+        self.api_method = api_method
 
         super().__init__(self.public_message)
 

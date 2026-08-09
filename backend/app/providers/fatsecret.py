@@ -46,6 +46,17 @@ class FatSecretSearchPayload:
     total_results: int | None
 
 
+
+
+@dataclass(frozen=True)
+class FatSecretFoodDetail:
+    source_food_id: str
+    source_food_name: str
+    brand_name: str | None
+    food_type: str | None
+    servings: tuple[FoodSearchRecord, ...]
+
+
 @dataclass(frozen=True)
 class FatSecretProviderConfig:
     api_edition: FatSecretApiEdition
@@ -184,6 +195,8 @@ class FatSecretClient:
             return access_token
 
     async def get_json(self, params: dict[str, str | int | bool]) -> JsonObject:
+        api_method = _parse_optional_string(params.get("method"))
+        operation = _operation_from_api_method(api_method)
         access_token = await self.get_access_token()
 
         try:
@@ -197,21 +210,45 @@ class FatSecretClient:
                 timeout=self._config.timeout_seconds,
             )
         except httpx.TimeoutException as exc:
-            raise FatSecretTimeoutError() from exc
+            raise FatSecretTimeoutError(
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            ) from exc
         except httpx.RequestError as exc:
-            raise FatSecretUnavailableError() from exc
+            raise FatSecretUnavailableError(
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            ) from exc
 
-        self._raise_for_http_status(response)
+        self._raise_for_http_status(
+            response,
+            operation=operation,
+            api_method=api_method,
+        )
 
         try:
             payload = response.json()
         except ValueError as exc:
-            raise FatSecretInvalidResponseError() from exc
+            raise FatSecretInvalidResponseError(
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            ) from exc
 
         if not isinstance(payload, dict):
-            raise FatSecretInvalidResponseError()
+            raise FatSecretInvalidResponseError(
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
-        self._raise_for_api_error(payload)
+        self._raise_for_api_error(
+            payload,
+            operation=operation,
+            api_method=api_method,
+        )
 
         return payload
 
@@ -278,39 +315,93 @@ class FatSecretClient:
 
         return access_token, expires_in
 
-    def _raise_for_http_status(self, response: httpx.Response) -> None:
+    def _raise_for_http_status(
+        self,
+        response: httpx.Response,
+        *,
+        operation: str | None,
+        api_method: str | None,
+    ) -> None:
         status_code = response.status_code
 
         if 200 <= status_code < 300:
             return
 
         if status_code == 401:
-            raise FatSecretAuthenticationError()
+            raise FatSecretAuthenticationError(
+                provider_error_type="http_401",
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
         if status_code == 403:
-            raise FatSecretPermissionError()
+            raise FatSecretPermissionError(
+                provider_error_type="http_403",
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
         if status_code == 429:
-            raise FatSecretRateLimitError()
+            raise FatSecretRateLimitError(
+                provider_error_type="http_429",
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
         if status_code in {408, 504}:
-            raise FatSecretTimeoutError()
+            raise FatSecretTimeoutError(
+                provider_error_type=f"http_{status_code}",
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
         if status_code >= 500:
-            raise FatSecretUnavailableError()
+            raise FatSecretUnavailableError(
+                provider_error_type=f"http_{status_code}",
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
-        raise FatSecretUnavailableError()
+        raise FatSecretUnavailableError(
+            provider_error_type=f"http_{status_code}",
+            operation=operation,
+            api_edition=self._config.api_edition,
+            api_method=api_method,
+        )
 
-    def _raise_for_api_error(self, payload: JsonObject) -> None:
+    def _raise_for_api_error(
+        self,
+        payload: JsonObject,
+        *,
+        operation: str | None,
+        api_method: str | None,
+    ) -> None:
         error_code = _extract_error_code(payload)
+        error_message = _extract_error_message(payload)
+        error_type = _classify_api_error_type(error_code, error_message)
 
         if error_code == "20":
-            raise FatSecretUnavailableError()
+            raise FatSecretUnavailableError(
+                provider_error_code=error_code,
+                provider_error_type=error_type,
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
-        if error_code == "21":
-            raise FatSecretPermissionError()
-
-        error_message = _extract_error_message(payload)
+        if error_code in {"14", "21"}:
+            raise FatSecretPermissionError(
+                provider_error_code=error_code,
+                provider_error_type=error_type,
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
         if error_message is None:
             return
@@ -328,21 +419,60 @@ class FatSecretClient:
         )
 
         if any(keyword in lowered_message for keyword in permission_keywords):
-            raise FatSecretPermissionError()
+            raise FatSecretPermissionError(
+                provider_error_code=error_code,
+                provider_error_type=error_type,
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
         if any(keyword in lowered_message for keyword in ("auth", "credential", "token", "client")):
-            raise FatSecretAuthenticationError()
+            raise FatSecretAuthenticationError(
+                provider_error_code=error_code,
+                provider_error_type=error_type,
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
         if any(keyword in lowered_message for keyword in ("rate", "quota", "limit")):
-            raise FatSecretRateLimitError()
+            raise FatSecretRateLimitError(
+                provider_error_code=error_code,
+                provider_error_type=error_type,
+                operation=operation,
+                api_edition=self._config.api_edition,
+                api_method=api_method,
+            )
 
-        raise FatSecretUnavailableError()
+        raise FatSecretUnavailableError(
+            provider_error_code=error_code,
+            provider_error_type=error_type,
+            operation=operation,
+            api_edition=self._config.api_edition,
+            api_method=api_method,
+        )
 
 
 class FatSecretFoodProvider:
     def __init__(self, config: FatSecretProviderConfig, client: FatSecretClient | None = None) -> None:
         self._config = config
         self._client = client or FatSecretClient(config)
+
+    @property
+    def api_edition(self) -> FatSecretApiEdition:
+        return self._config.api_edition
+
+    @property
+    def search_method(self) -> str:
+        return self._config.search_method
+
+    @property
+    def get_method(self) -> str:
+        return self._config.get_method
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
 
     @property
     def provider_name(self) -> ProviderName:
@@ -451,12 +581,46 @@ class FatSecretFoodProvider:
         except TimeoutError as exc:
             raise FatSecretTimeoutError() from exc
 
-    async def get_food(self, food_id: str) -> FoodSearchRecord | None:
+    async def get_food(
+        self,
+        food_id: str,
+        serving_id: str | None = None,
+    ) -> FoodSearchRecord | None:
+        normalized_food_id = food_id.strip()
+        normalized_serving_id = serving_id.strip() if serving_id is not None else None
+
+        if normalized_serving_id == "":
+            normalized_serving_id = None
+
+        if normalized_food_id == "":
+            return None
+
+        food_payload = await self._get_food_payload(normalized_food_id)
+        record = self._record_from_food_payload(
+            food_payload,
+            preferred_serving_id=normalized_serving_id,
+        )
+
+        if record is None:
+            raise FatSecretInvalidResponseError()
+
+        return record
+
+    async def get_food_detail(self, food_id: str) -> FatSecretFoodDetail | None:
         normalized_food_id = food_id.strip()
 
         if normalized_food_id == "":
             return None
 
+        food_payload = await self._get_food_payload(normalized_food_id)
+        detail = self._detail_from_food_payload(food_payload)
+
+        if detail is None:
+            raise FatSecretInvalidResponseError()
+
+        return detail
+
+    async def _get_food_payload(self, normalized_food_id: str) -> JsonObject:
         params: dict[str, str | int | bool] = {
             "method": self._config.get_method,
             "food_id": normalized_food_id,
@@ -476,21 +640,53 @@ class FatSecretFoodProvider:
         if not isinstance(food_payload, dict):
             raise FatSecretInvalidResponseError()
 
-        record = self._record_from_food_payload(food_payload)
+        return food_payload
 
-        if record is None:
-            raise FatSecretInvalidResponseError()
-
-        return record
-
-    def _record_from_food_payload(self, food_payload: JsonObject) -> FoodSearchRecord | None:
+    def _detail_from_food_payload(self, food_payload: JsonObject) -> FatSecretFoodDetail | None:
         food_id = _parse_optional_string(food_payload.get("food_id"))
         food_name = _parse_optional_string(food_payload.get("food_name"))
 
         if food_id is None or food_name is None:
             return None
 
-        serving = _select_serving(_extract_servings(food_payload))
+        serving_records = tuple(
+            record
+            for serving in _extract_servings(food_payload)
+            if (record := self._record_from_food_and_serving(food_payload, serving)) is not None
+        )
+
+        return FatSecretFoodDetail(
+            source_food_id=food_id,
+            source_food_name=food_name,
+            brand_name=_parse_optional_string(food_payload.get("brand_name")),
+            food_type=_parse_optional_string(food_payload.get("food_type")),
+            servings=serving_records,
+        )
+
+    def _record_from_food_payload(
+        self,
+        food_payload: JsonObject,
+        *,
+        preferred_serving_id: str | None = None,
+    ) -> FoodSearchRecord | None:
+        serving = _select_serving(
+            _extract_servings(food_payload),
+            preferred_serving_id=preferred_serving_id,
+        )
+
+        return self._record_from_food_and_serving(food_payload, serving)
+
+    def _record_from_food_and_serving(
+        self,
+        food_payload: JsonObject,
+        serving: JsonObject | None,
+    ) -> FoodSearchRecord | None:
+        food_id = _parse_optional_string(food_payload.get("food_id"))
+        food_name = _parse_optional_string(food_payload.get("food_name"))
+
+        if food_id is None or food_name is None:
+            return None
+
         source_serving_id = _parse_optional_string(serving.get("serving_id")) if serving else None
         dto_id = _build_food_id(food_id, source_serving_id)
 
@@ -539,6 +735,57 @@ class FatSecretFoodProvider:
             ),
             source_region=self._config.region,
         )
+
+
+def _operation_from_api_method(api_method: str | None) -> str | None:
+    if api_method is None:
+        return None
+
+    normalized_method = api_method.casefold()
+
+    if normalized_method.startswith("foods.search"):
+        return "search"
+
+    if normalized_method.startswith("food.get"):
+        return "detail"
+
+    return None
+
+
+def _classify_api_error_type(error_code: str | None, error_message: str | None) -> str | None:
+    if error_code == "14":
+        return "missing_scope"
+
+    if error_code == "21":
+        return "invalid_ip"
+
+    if error_code == "20":
+        return "temporarily_unavailable"
+
+    if error_message is None:
+        return None
+
+    lowered_message = error_message.casefold()
+
+    if "scope" in lowered_message:
+        return "missing_scope"
+
+    if any(keyword in lowered_message for keyword in ("permission", "permitted", "forbidden")):
+        return "permission"
+
+    if any(keyword in lowered_message for keyword in ("localization", "region", "language")):
+        return "localization_permission"
+
+    if "ip" in lowered_message:
+        return "invalid_ip"
+
+    if any(keyword in lowered_message for keyword in ("auth", "credential", "token", "client")):
+        return "authentication"
+
+    if any(keyword in lowered_message for keyword in ("rate", "quota", "limit")):
+        return "rate_limit"
+
+    return "api_error"
 
 
 def _normalize_edition(value: str) -> FatSecretApiEdition:
@@ -655,9 +902,18 @@ def _extract_servings(food_payload: JsonObject) -> list[JsonObject]:
     return _as_object_list(food_payload.get("serving"))
 
 
-def _select_serving(servings: list[JsonObject]) -> JsonObject | None:
+def _select_serving(
+    servings: list[JsonObject],
+    *,
+    preferred_serving_id: str | None = None,
+) -> JsonObject | None:
     if len(servings) == 0:
         return None
+
+    if preferred_serving_id is not None:
+        for serving in servings:
+            if _parse_optional_string(serving.get("serving_id")) == preferred_serving_id:
+                return serving
 
     for serving in servings:
         amount = _parse_non_negative_number(serving.get("metric_serving_amount"))

@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { AppDataSnapshot } from '../src/storage';
@@ -110,6 +110,49 @@ test('restoreAppDataSnapshot round-trips valid versioned local data', () => {
   assert.deepEqual(restoreAppDataSnapshot(serializeAppDataSnapshot(data), fallback), data);
 });
 
+test('restoreAppDataSnapshot preserves curated nutrition source metadata', () => {
+  const curatedFood: Food = {
+    ...food,
+    id: 'food-curated',
+    sourceFoodId: 'kr-bhc-test',
+    sourceFoodName: '테스트치킨',
+    catalogId: 'kr-bhc-kwasakking',
+    canonicalName: '콰삭킹',
+    dataSource: 'curated',
+    nutritionPerServing: makeNutrition({
+      caloriesKcal: null,
+      proteinG: 20,
+      carbohydrateG: 0,
+      fatG: null,
+    }),
+    nutritionSource: {
+      type: 'brand_official',
+      name: '브랜드 공식 영양정보',
+      url: 'https://example.test/official-nutrition',
+      recordId: 'official-test-chicken',
+      checkedAt: '2026-08-09',
+    },
+    verificationStatus: 'reviewed',
+  };
+  const data: AppDataSnapshot = {
+    fixedMealTemplates: [],
+    foods: [curatedFood],
+    hiddenFixedMealSourceKeys: {},
+    mealsByDate: {},
+    todayTargets: fallback.todayTargets,
+  };
+
+  const restored = restoreAppDataSnapshot(serializeAppDataSnapshot(data), fallback);
+
+  assert.equal(restored.foods[0]?.dataSource, 'curated');
+  assert.equal(restored.foods[0]?.catalogId, 'kr-bhc-kwasakking');
+  assert.equal(restored.foods[0]?.canonicalName, '콰삭킹');
+  assert.equal(restored.foods[0]?.nutritionPerServing.caloriesKcal, null);
+  assert.equal(restored.foods[0]?.nutritionPerServing.carbohydrateG, 0);
+  assert.equal(restored.foods[0]?.nutritionPerServing.fatG, null);
+  assert.deepEqual(restored.foods[0]?.nutritionSource, curatedFood.nutritionSource);
+  assert.equal(restored.foods[0]?.verificationStatus, 'reviewed');
+});
 test('restoreAppDataSnapshot preserves future dataSource values without dropping foods or meal rows', () => {
   const futureFood: Food = {
     ...food,

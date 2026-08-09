@@ -1,4 +1,4 @@
-# FatSecret Data Policy Notes
+﻿# FatSecret Data Policy Notes
 
 이 문서는 현재 구현의 데이터 저장 흐름과 FatSecret 연동 시 production 전에 확인해야 할 정책 리스크를 정리한다. 법률적 결론이 아니며, 출시 전 FatSecret 이용 조건과 계약 범위를 별도로 검토해야 한다.
 
@@ -10,12 +10,14 @@
 
 | 위치 | 저장될 수 있는 필드 |
 | --- | --- |
-| `foods[]` | `id`, `source`, `sourceFoodId`, `sourceFoodName`, `name`, `brandName`, `category`, `servingSize`, `servingUnit`, `nutritionPerServing`, `updatedAt`, `dataSource`, `sourceServingId`, `servingDescription`, `sourceRegion` |
+| `foods[]` | `id`, `source`, `sourceFoodId`, `sourceFoodName`, `name`, `displayName`, `brandName`, `category`, `catalogId`, `canonicalName`, `servingSize`, `servingUnit`, `nutritionPerServing`, `updatedAt`, `dataSource`, `sourceServingId`, `servingDescription`, `sourceRegion`, `nutritionSource`, `verificationStatus` |
 | `foods[].nutritionPerServing` | `caloriesKcal`, `carbohydrateG`, `proteinG`, `fatG`, plus 앱 내부 nullable nutrition fields |
 | `mealsByDate.*[].foods[]` | `foodId`, `consumedGrams`, `calculatedNutrition`, checked state, timestamps |
 | `fixedMealTemplates[].items[].foodSnapshot` | 고정 식단으로 승격한 경우 선택 당시 `Food` snapshot 전체 |
 
 이번 작업은 backend DB 영구 저장이나 장기 cache를 추가하지 않는다. 다만 frontend 개발용 local storage에는 선택된 FatSecret 기반 `Food` 값과 계산된 영양값이 남을 수 있다. 이 상태를 production-ready 저장 정책으로 간주하면 안 된다.
+
+`nutritionSource`와 `verificationStatus`는 `curated_nutrition` 결과의 provider-neutral 출처 추적 metadata다. FatSecret nutrition payload를 catalog curated 값으로 복제하는 용도로 쓰면 안 되며, 식약처/브랜드/제조사 등 독립적으로 사용 가능한 출처가 있을 때만 저장한다.
 
 ## FatSecret storable data 검토 필요 사항
 
@@ -26,6 +28,7 @@ production 출시 전 최소 확인 항목:
 - 음식명, 브랜드명, serving 설명, 영양값을 사용자 기기에 저장할 수 있는지
 - 저장 가능하다면 허용되는 필드, 보존 기간, cache invalidation 조건
 - `sourceFoodId`와 `sourceServingId` 같은 provider identifier만 저장하는 방식이 허용되는지
+- `catalogId`와 `canonicalName` 같은 자체 identity metadata를 provider payload와 분리해 저장하는 방식이 충분한지
 - 사용자가 만든 meal 기록의 `calculatedNutrition`이 FatSecret 데이터의 저장 또는 파생 데이터 저장으로 취급되는지
 - fixed meal template의 `foodSnapshot` 보존이 계약상 허용되는지
 - region/language별 데이터 접근 권한과 화면 표시 요구 사항

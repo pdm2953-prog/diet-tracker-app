@@ -7,6 +7,32 @@ FoodDataSource = str
 FoodSearchQueryStatus = Literal["identity", "translated", "unresolved"]
 
 
+class NutritionSourceMetadata(BaseModel):
+    type: str
+    name: str
+    url: str | None = None
+    record_id: str | None = None
+    checked_at: str
+
+
+class NutritionSourceDto(BaseModel):
+    type: str
+    name: str
+    url: str | None = None
+    recordId: str | None = None
+    checkedAt: str
+
+    @classmethod
+    def from_metadata(cls, metadata: NutritionSourceMetadata) -> "NutritionSourceDto":
+        return cls(
+            type=metadata.type,
+            name=metadata.name,
+            url=metadata.url,
+            recordId=metadata.record_id,
+            checkedAt=metadata.checked_at,
+        )
+
+
 class FoodSearchRecord(BaseModel):
     id: str
     data_source: FoodDataSource
@@ -15,6 +41,9 @@ class FoodSearchRecord(BaseModel):
     source_serving_id: str | None = None
     name: str
     brand_name: str | None
+    category: str | None = None
+    catalog_id: str | None = None
+    canonical_name: str | None = None
     serving_description: str | None = None
     serving_size: float | None = Field(default=None, ge=0)
     serving_unit: str | None
@@ -23,6 +52,8 @@ class FoodSearchRecord(BaseModel):
     carbs_g: float | None = Field(default=None, ge=0)
     fat_g: float | None = Field(default=None, ge=0)
     source_region: str | None = None
+    nutrition_source: NutritionSourceMetadata | None = None
+    verification_status: str | None = None
     keywords: tuple[str, ...] = ()
 
     @property
@@ -30,10 +61,15 @@ class FoodSearchRecord(BaseModel):
         searchable_values = (
             self.name,
             self.brand_name,
+            self.category,
+            self.catalog_id,
+            self.canonical_name,
             self.source_food_id,
             self.source_food_name,
             self.source_serving_id,
             self.serving_description,
+            self.verification_status,
+            self.nutrition_source.name if self.nutrition_source is not None else None,
             *self.keywords,
         )
 
@@ -56,6 +92,9 @@ class FoodSearchItemDto(BaseModel):
     name: str
     displayName: str | None = None
     brandName: str | None
+    category: str | None = None
+    catalogId: str | None = None
+    canonicalName: str | None = None
     servingSize: float | None = Field(default=None, ge=0)
     servingUnit: str | None
     nutritionPerServing: NutritionPerServingDto
@@ -65,6 +104,8 @@ class FoodSearchItemDto(BaseModel):
     sourceServingId: str | None = None
     servingDescription: str | None = None
     sourceRegion: str | None = None
+    nutritionSource: NutritionSourceDto | None = None
+    verificationStatus: str | None = None
     wasLocalized: bool | None = None
     displayLocale: str | None = None
     localizer: str | None = None
@@ -84,6 +125,9 @@ class FoodSearchItemDto(BaseModel):
             name=record.name,
             displayName=display_name,
             brandName=record.brand_name,
+            category=record.category,
+            catalogId=record.catalog_id,
+            canonicalName=record.canonical_name,
             servingSize=record.serving_size,
             servingUnit=record.serving_unit,
             nutritionPerServing=NutritionPerServingDto(
@@ -98,6 +142,12 @@ class FoodSearchItemDto(BaseModel):
             sourceServingId=record.source_serving_id,
             servingDescription=record.serving_description,
             sourceRegion=record.source_region,
+            nutritionSource=(
+                NutritionSourceDto.from_metadata(record.nutrition_source)
+                if record.nutrition_source is not None
+                else None
+            ),
+            verificationStatus=record.verification_status,
             wasLocalized=was_localized,
             displayLocale=display_locale,
             localizer=localizer,

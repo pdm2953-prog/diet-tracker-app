@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Protocol
 
 from app.models.food import FoodSearchRecord
 
 
-ProviderName = Literal["mock", "fatsecret"]
+ProviderName = str
 
 
 @dataclass(frozen=True)
@@ -41,5 +41,9 @@ class FoodProvider(Protocol):
     ) -> FoodSearchProviderResponse:
         raise NotImplementedError
 
-    async def get_food(self, food_id: str) -> FoodSearchRecord | None:
+    async def get_food(
+        self,
+        food_id: str,
+        serving_id: str | None = None,
+    ) -> FoodSearchRecord | None:
         raise NotImplementedError

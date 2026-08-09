@@ -1,8 +1,10 @@
-import type {
+﻿import type {
   Food,
   FoodDataSource,
   FoodSearchQueryMetadata,
   FoodSearchQueryStatus,
+  NutritionSourceMetadata,
+  NutritionVerificationStatus,
 } from '../models';
 import { parseOptionalFoodDataSource } from '../utils/foodDataSource';
 
@@ -13,10 +15,15 @@ export type BackendFoodNutritionPerServingDto = {
   fatG: number | null;
 };
 
+export type BackendNutritionSourceDto = NutritionSourceMetadata;
+
 export type BackendFoodSearchItemDto = {
   id: string;
   name: string;
   displayName?: string;
+  category?: string | null;
+  catalogId?: string;
+  canonicalName?: string;
   brandName: string | null;
   servingSize: number | null;
   servingUnit: string | null;
@@ -30,6 +37,8 @@ export type BackendFoodSearchItemDto = {
   wasLocalized?: boolean;
   displayLocale?: string;
   localizer?: string;
+  nutritionSource?: BackendNutritionSourceDto;
+  verificationStatus?: NutritionVerificationStatus;
 };
 
 export type BackendFoodSearchResponseDto = {
@@ -106,7 +115,7 @@ export function adaptBackendFoodSearchItem(
     sourceFoodId: dto.sourceFoodId ?? dto.id,
     name: dto.name,
     brandName: dto.brandName,
-    category: null,
+    category: dto.category ?? null,
     servingSize: dto.servingSize,
     servingUnit: dto.servingUnit,
     nutritionPerServing: {
@@ -130,6 +139,14 @@ export function adaptBackendFoodSearchItem(
 
   if (dto.displayName !== undefined) {
     food.displayName = dto.displayName;
+  }
+
+  if (dto.catalogId !== undefined) {
+    food.catalogId = dto.catalogId;
+  }
+
+  if (dto.canonicalName !== undefined) {
+    food.canonicalName = dto.canonicalName;
   }
 
   if (dto.sourceFoodName !== undefined) {
@@ -160,6 +177,14 @@ export function adaptBackendFoodSearchItem(
     food.localizer = dto.localizer;
   }
 
+  if (dto.nutritionSource !== undefined) {
+    food.nutritionSource = dto.nutritionSource;
+  }
+
+  if (dto.verificationStatus !== undefined) {
+    food.verificationStatus = dto.verificationStatus;
+  }
+
   return food;
 }
 
@@ -172,6 +197,10 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
   const nutritionPerServing = parseBackendFoodNutrition(value.nutritionPerServing);
   const dataSource = parseOptionalFoodDataSource(value.dataSource);
   const displayName = parseOptionalString(value.displayName);
+  const category = value.category === null ? null : parseOptionalString(value.category);
+  const categoryIsMalformed = category === null && value.category !== null;
+  const catalogId = parseOptionalString(value.catalogId);
+  const canonicalName = parseOptionalString(value.canonicalName);
   const sourceFoodId = parseOptionalString(value.sourceFoodId);
   const sourceFoodName = parseOptionalString(value.sourceFoodName);
   const sourceServingId = parseOptionalString(value.sourceServingId);
@@ -180,6 +209,8 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
   const wasLocalized = parseOptionalBoolean(value.wasLocalized);
   const displayLocale = parseOptionalString(value.displayLocale);
   const localizer = parseOptionalString(value.localizer);
+  const nutritionSource = parseOptionalNutritionSource(value.nutritionSource);
+  const verificationStatus = parseOptionalString(value.verificationStatus);
 
   if (
     !isNonEmptyString(value.id)
@@ -189,6 +220,9 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
     || !isNullableString(value.servingUnit)
     || nutritionPerServing === null
     || displayName === null
+    || categoryIsMalformed
+    || catalogId === null
+    || canonicalName === null
     || sourceFoodId === null
     || sourceFoodName === null
     || sourceServingId === null
@@ -197,6 +231,8 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
     || wasLocalized === null
     || displayLocale === null
     || localizer === null
+    || nutritionSource === null
+    || verificationStatus === null
   ) {
     return null;
   }
@@ -205,6 +241,9 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
     id: value.id,
     name: value.name,
     ...(displayName !== undefined ? { displayName } : {}),
+    ...(category !== undefined ? { category } : {}),
+    ...(catalogId !== undefined ? { catalogId } : {}),
+    ...(canonicalName !== undefined ? { canonicalName } : {}),
     brandName: value.brandName,
     servingSize,
     servingUnit: value.servingUnit,
@@ -218,6 +257,8 @@ function parseBackendFoodSearchItem(value: unknown): BackendFoodSearchItemDto | 
     ...(wasLocalized !== undefined ? { wasLocalized } : {}),
     ...(displayLocale !== undefined ? { displayLocale } : {}),
     ...(localizer !== undefined ? { localizer } : {}),
+    ...(nutritionSource !== undefined ? { nutritionSource } : {}),
+    ...(verificationStatus !== undefined ? { verificationStatus } : {}),
   };
 }
 
@@ -243,6 +284,37 @@ function parseBackendFoodNutrition(
     proteinG,
     carbsG,
     fatG,
+  };
+}
+
+function parseOptionalNutritionSource(value: unknown): BackendNutritionSourceDto | undefined | null {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const url = parseNullableStringField(value.url);
+  const recordId = parseNullableStringField(value.recordId);
+
+  if (
+    !isNonEmptyString(value.type)
+    || !isNonEmptyString(value.name)
+    || url === undefined
+    || recordId === undefined
+    || !isNonEmptyString(value.checkedAt)
+  ) {
+    return null;
+  }
+
+  return {
+    type: value.type,
+    name: value.name,
+    url,
+    recordId,
+    checkedAt: value.checkedAt,
   };
 }
 
@@ -295,6 +367,16 @@ function parseNullableNonNegativeNumber(value: unknown): number | null | undefin
   }
 
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : undefined;
+}
+
+function parseNullableStringField(value: unknown): string | null | undefined {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  return typeof value === 'string'
     ? value
     : undefined;
 }

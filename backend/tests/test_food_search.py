@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.main import app, create_app
-from app.models.food import FoodSearchRecord
+from app.models.food import FoodSearchRecord, NutritionSourceMetadata
 from app.providers.factory import get_food_provider
 from app.providers.interfaces import (
     FoodSearchProviderLocalization,
@@ -314,3 +314,127 @@ def test_food_search_response_localizes_display_name_without_mutating_fatsecret_
         "carbsG": 0,
         "fatG": 3.6,
     }
+
+
+def test_food_search_response_uses_catalog_canonical_display_name_and_preserves_source_name() -> None:
+    class FakeFoodSearchService:
+        async def search_foods(
+            self,
+            query: str,
+            page: int,
+            page_size: int,
+        ) -> FoodSearchServiceResponse:
+            return FoodSearchServiceResponse(
+                items=[
+                    FoodSearchRecord(
+                        id="fatsecret-kwasakking-serving-100",
+                        data_source="fatsecret",
+                        source_food_id="kwasakking-source-id",
+                        source_food_name="FatSecret Original Kwasakking",
+                        source_serving_id="serving-100",
+                        name="FatSecret Original Kwasakking",
+                        brand_name="BHC",
+                        category="치킨",
+                        catalog_id="kr-bhc-kwasakking",
+                        canonical_name="콰삭킹",
+                        serving_description="100 g",
+                        serving_size=100,
+                        serving_unit="g",
+                        calories_kcal=321,
+                        protein_g=22,
+                        carbs_g=15,
+                        fat_g=18,
+                        source_region="US",
+                    )
+                ],
+                page=page,
+                page_size=page_size,
+                has_more=False,
+            )
+
+    app.dependency_overrides[get_food_search_service] = lambda: FakeFoodSearchService()
+    response = client.get("/api/v1/foods/search", params={"q": "콰삭킹"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["name"] == "FatSecret Original Kwasakking"
+    assert item["sourceFoodName"] == "FatSecret Original Kwasakking"
+    assert item["displayName"] == "콰삭킹"
+    assert item["brandName"] == "BHC"
+    assert item["category"] == "치킨"
+    assert item["catalogId"] == "kr-bhc-kwasakking"
+    assert item["canonicalName"] == "콰삭킹"
+    assert item["localizer"] == "korean_food_catalog"
+    assert item["nutritionPerServing"] == {
+        "caloriesKcal": 321,
+        "proteinG": 22,
+        "carbsG": 15,
+        "fatG": 18,
+    }
+
+
+def test_food_search_response_includes_curated_nutrition_metadata_and_preserves_nulls() -> None:
+    class FakeFoodSearchService:
+        async def search_foods(
+            self,
+            query: str,
+            page: int,
+            page_size: int,
+        ) -> FoodSearchServiceResponse:
+            return FoodSearchServiceResponse(
+                items=[
+                    FoodSearchRecord(
+                        id="curated-kr-bhc-kwasakking",
+                        data_source="curated",
+                        source_food_id="kr-bhc-kwasakking",
+                        source_food_name="콰삭킹",
+                        name="콰삭킹",
+                        brand_name="BHC",
+                        category="치킨",
+                        catalog_id="kr-bhc-kwasakking",
+                        canonical_name="콰삭킹",
+                        serving_description="100 g",
+                        serving_size=100,
+                        serving_unit="g",
+                        calories_kcal=None,
+                        protein_g=20,
+                        carbs_g=0,
+                        fat_g=None,
+                        source_region="KR",
+                        nutrition_source=NutritionSourceMetadata(
+                            type="brand_official",
+                            name="BHC 공식 영양정보",
+                            url="https://example.test/bhc",
+                            record_id="bhc-kwasakking",
+                            checked_at="2026-08-09",
+                        ),
+                        verification_status="reviewed",
+                    )
+                ],
+                page=page,
+                page_size=page_size,
+                has_more=False,
+            )
+
+    app.dependency_overrides[get_food_search_service] = lambda: FakeFoodSearchService()
+    response = client.get("/api/v1/foods/search", params={"q": "콰삭킹"})
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["dataSource"] == "curated"
+    assert item["sourceFoodId"] == "kr-bhc-kwasakking"
+    assert item["displayName"] == "콰삭킹"
+    assert item["nutritionPerServing"] == {
+        "caloriesKcal": None,
+        "proteinG": 20,
+        "carbsG": 0,
+        "fatG": None,
+    }
+    assert item["nutritionSource"] == {
+        "type": "brand_official",
+        "name": "BHC 공식 영양정보",
+        "url": "https://example.test/bhc",
+        "recordId": "bhc-kwasakking",
+        "checkedAt": "2026-08-09",
+    }
+    assert item["verificationStatus"] == "reviewed"

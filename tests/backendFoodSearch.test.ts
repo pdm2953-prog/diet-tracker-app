@@ -136,6 +136,89 @@ test('adaptBackendFoodSearchItem safely maps optional FatSecret metadata', () =>
   assert.equal(food.nutritionPerServing.carbohydrateG, 0);
 });
 
+test('adaptBackendFoodSearchItem preserves provider-neutral catalog metadata', () => {
+  const parsedResponse = parseBackendFoodSearchResponse({
+    items: [{
+      ...backendFoodDto,
+      category: '치킨',
+      catalogId: 'kr-bhc-kwasakking',
+      canonicalName: '콰삭킹',
+      displayName: '콰삭킹',
+      brandName: 'BHC',
+    }],
+    page: 1,
+    pageSize: 20,
+    hasMore: false,
+  });
+
+  assert.equal(parsedResponse !== null, true);
+
+  if (parsedResponse !== null) {
+    const food = adaptBackendFoodSearchItem(parsedResponse.items[0], {
+      updatedAt: '2026-07-30T00:00:00.000Z',
+    });
+
+    assert.equal(food.category, '치킨');
+    assert.equal(food.catalogId, 'kr-bhc-kwasakking');
+    assert.equal(food.canonicalName, '콰삭킹');
+    assert.equal(food.displayName, '콰삭킹');
+    assert.equal(food.brandName, 'BHC');
+  }
+});
+test('adaptBackendFoodSearchItem preserves curated nutrition metadata and null values', () => {
+  const parsedResponse = parseBackendFoodSearchResponse({
+    items: [{
+      ...backendFoodDto,
+      id: 'curated-kr-bhc-kwasakking',
+      dataSource: 'curated',
+      sourceFoodId: 'kr-bhc-kwasakking',
+      sourceFoodName: '콰삭킹',
+      category: '치킨',
+      catalogId: 'kr-bhc-kwasakking',
+      canonicalName: '콰삭킹',
+      brandName: 'BHC',
+      nutritionPerServing: {
+        caloriesKcal: null,
+        proteinG: 20,
+        carbsG: 0,
+        fatG: null,
+      },
+      nutritionSource: {
+        type: 'brand_official',
+        name: 'BHC 공식 영양정보',
+        url: 'https://example.test/bhc',
+        recordId: 'bhc-kwasakking',
+        checkedAt: '2026-08-09',
+      },
+      verificationStatus: 'reviewed',
+    }],
+    page: 1,
+    pageSize: 20,
+    hasMore: false,
+  });
+
+  assert.equal(parsedResponse !== null, true);
+
+  if (parsedResponse !== null) {
+    const food = adaptBackendFoodSearchItem(parsedResponse.items[0], {
+      updatedAt: '2026-07-30T00:00:00.000Z',
+    });
+
+    assert.equal(food.dataSource, 'curated');
+    assert.equal(food.sourceFoodId, 'kr-bhc-kwasakking');
+    assert.equal(food.nutritionPerServing.caloriesKcal, null);
+    assert.equal(food.nutritionPerServing.carbohydrateG, 0);
+    assert.equal(food.nutritionPerServing.fatG, null);
+    assert.deepEqual(food.nutritionSource, {
+      type: 'brand_official',
+      name: 'BHC 공식 영양정보',
+      url: 'https://example.test/bhc',
+      recordId: 'bhc-kwasakking',
+      checkedAt: '2026-08-09',
+    });
+    assert.equal(food.verificationStatus, 'reviewed');
+  }
+});
 test('parseBackendFoodSearchResponse preserves extensible backend dataSource values', () => {
   const dataSources = ['database', 'curated', 'future-provider.v2'];
 

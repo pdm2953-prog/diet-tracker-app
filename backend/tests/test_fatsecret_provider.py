@@ -891,6 +891,38 @@ def test_authentication_failure_is_classified() -> None:
         run(scenario())
 
 
+def test_missing_scope_includes_safe_diagnostic_metadata() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "oauth.fatsecret.com":
+            return token_response()
+
+        return httpx.Response(200, json={
+            "error": {
+                "code": 14,
+                "message": "Missing scope: foods.search.v2",
+            }
+        })
+
+    async def scenario() -> None:
+        provider = make_provider(
+            handler,
+            config=make_config(api_edition="basic", region="US", language="en"),
+        )
+        await provider.search_foods("chicken", 1, 20)
+
+    with pytest.raises(FatSecretPermissionError) as exc_info:
+        run(scenario())
+
+    error = exc_info.value
+    assert error.provider_error_code == "14"
+    assert error.provider_error_type == "missing_scope"
+    assert error.operation == "search"
+    assert error.api_edition == "basic"
+    assert error.api_method == "foods.search"
+    assert CLIENT_SECRET not in str(error)
+    assert ACCESS_TOKEN not in str(error)
+
+
 def test_missing_scope_is_permission_error_not_empty_results() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.host == "oauth.fatsecret.com":
@@ -1021,4 +1053,104 @@ def test_api_error_code_21_is_permission_error_without_exposing_ip(
     with pytest.raises(FatSecretPermissionError) as exc_info:
         run(scenario())
 
+    assert exc_info.value.provider_error_code == "21"
+    assert exc_info.value.provider_error_type == "invalid_ip"
     assert "203.0.113.10" not in str(exc_info.value)
+
+def test_get_food_detail_returns_all_servings_using_provider_detail_abstraction() -> None:
+    api_requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "oauth.fatsecret.com":
+            return token_response()
+
+        api_requests.append(request)
+        return httpx.Response(200, json={
+            "food": food_payload(
+                food_id="123",
+                food_name="Chicken Breast",
+                brand_name="Test Brand",
+                servings=[
+                    serving_payload(
+                        serving_id="serving-100g",
+                        amount="100.000",
+                        calories="165",
+                        description="100 g",
+                    ),
+                    serving_payload(
+                        serving_id="serving-piece",
+                        amount="50",
+                        calories="80",
+                        description="1 piece",
+                    ),
+                ],
+            ) | {"food_type": "Brand"},
+        })
+
+    async def scenario():
+        provider = make_provider(
+            handler,
+            config=make_config(api_edition="basic", region="US", language="en"),
+        )
+        return await provider.get_food_detail("123")
+
+    detail = run(scenario())
+
+    assert detail is not None
+    assert detail.source_food_id == "123"
+    assert detail.source_food_name == "Chicken Breast"
+    assert detail.brand_name == "Test Brand"
+    assert detail.food_type == "Brand"
+    assert [serving.source_serving_id for serving in detail.servings] == [
+        "serving-100g",
+        "serving-piece",
+    ]
+
+    params = request_params(api_requests[0])
+    assert params == {
+        "method": "food.get.v2",
+        "food_id": "123",
+        "format": "json",
+    }
+    assert "region" not in params
+    assert "language" not in params
+    assert "flag_default_serving" not in params
+    assert "include_sub_categories" not in params
+
+
+def test_get_food_prefers_requested_serving_id_when_provided() -> None:
+    api_requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "oauth.fatsecret.com":
+            return token_response()
+
+        api_requests.append(request)
+        return httpx.Response(200, json={
+            "food": food_payload(servings=[
+                serving_payload(
+                    serving_id="serving-100g",
+                    amount="100.000",
+                    calories="165",
+                    description="100 g",
+                ),
+                serving_payload(
+                    serving_id="serving-preferred",
+                    amount="50",
+                    calories="80",
+                    description="50 g",
+                ),
+            ]),
+        })
+
+    async def scenario():
+        provider = make_provider(handler)
+        return await provider.get_food("123", "serving-preferred")
+
+    item = run(scenario())
+
+    assert item is not None
+    assert item.source_serving_id == "serving-preferred"
+    assert item.serving_size == 50
+    assert item.calories_kcal == 80
+    assert request_params(api_requests[0])["method"] == "food.get.v5"
