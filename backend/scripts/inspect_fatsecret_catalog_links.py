@@ -155,9 +155,10 @@ def resolve_inspection_targets(
     if item is None:
         raise DiagnosticError(f"KoreanFoodCatalog에서 항목을 찾지 못했습니다: {query}")
 
-    if item.match_strategy != "external_id":
+    if item.match_strategy not in ("external_id", "provider_search"):
         raise DiagnosticError(
-            f"external_id 항목만 검사할 수 있습니다: {item.id} ({item.match_strategy})"
+            f"external_id 또는 provider_search 항목만 검사할 수 있습니다: "
+            f"{item.id} ({item.match_strategy})"
         )
 
     return [InspectionTarget(item=item, ref=first_fatsecret_ref(item))]
@@ -489,7 +490,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Read-only diagnostic for manually verifying KoreanFoodCatalog "
-            "FatSecret exact-link candidates."
+            "FatSecret exact-link and provider-search candidates."
         )
     )
     parser.add_argument(

@@ -2,7 +2,7 @@
 
 `KoreanFoodCatalog`의 기본 책임은 한국 음식 identity와 provider-neutral link를 관리하는 것이다. FatSecret 응답을 장기 저장하거나 영양 payload를 복제하는 DB가 아니다.
 
-예외적으로 `curated_nutrition` 전략은 FatSecret Basic에서 정확한 브랜드 메뉴를 찾을 수 없고, 식약처/브랜드/제조사처럼 독립적으로 사용 가능한 출처에서 영양정보를 확인한 경우에만 catalog nutrition을 가진다. 이 값은 FatSecret payload 복사본이 아니어야 한다.
+예외적으로 `curated_nutrition` 전략은 FatSecret Premier KR 같은 provider 경로까지 검토한 뒤에도 정확한 브랜드 메뉴를 식별할 수 없고, 식약처/브랜드/제조사처럼 독립적으로 사용 가능한 출처에서 영양정보를 확인한 경우에만 catalog nutrition을 가진다. 이 값은 FatSecret payload 복사본이 아니어야 한다.
 
 Frontend는 계속 `GET /api/v1/foods/search`만 호출한다. FatSecret, Basic/Premier, 영문 검색어, `sourceFoodId`, `sourceServingId`, catalog routing, 향후 자체 DB provider 우선순위는 backend 내부 구현이다.
 
@@ -33,7 +33,7 @@ Catalog가 관리하지 않는 것:
 
 ### `external_id`
 
-검증된 외부 provider food id가 있는 브랜드 고유 메뉴에 사용한다.
+검증된 외부 provider food id가 있는 브랜드 고유 메뉴에 사용한다. Schema v1에서는 routing 검증 대기 중인 브랜드 메뉴도 `sourceFoodId: null`, `sourceServingId: null`, `searchTerms: []`인 pending exact-link candidate로 표현한다. 이 상태는 `VERIFIED_EXTERNAL_ID`가 아니다.
 
 예: BHC 뿌링클, BHC 콰삭킹, 교촌 허니콤보, 굽네 고추바사삭.
 
@@ -47,7 +47,7 @@ Catalog가 관리하지 않는 것:
 
 예: 김치찌개, 된장찌개, 비빔밥, 불고기.
 
-하나의 외부 `food_id`에 고정하지 않고 검증된 provider별 search term으로 후보를 검색한다. Search term은 provider routing metadata이며 frontend에 노출하지 않는다.
+하나의 외부 `food_id`에 고정하지 않고 검증된 provider별 search term으로 후보를 검색한다. Search term은 provider routing metadata이며 frontend에 노출하지 않는다. 검증 전 일반 음식 seed는 provider ref를 유지하되 `searchTerms: []` pending 상태로 둘 수 있으며, 이 경우 backend는 provider에 임의 query를 보내지 않고 빈 결과를 반환한다. FatSecret Basic US/en 후보에서 해당 한국 음식과 의미적으로 동일한 음식 identity가 확인되어야 verified로 본다. 단순 ingredient match, 특정 레시피/가공식품만 나오는 결과, query token 일부만 맞는 unrelated result는 verified로 등록하지 않는다.
 
 ### `curated_nutrition`
 
@@ -119,8 +119,8 @@ Alias normalization은 다음을 적용한다.
 1. `id`를 `kr-...` 형태의 stable key로 정한다.
 2. `canonicalName`, `brandName`, `category`, `aliases`를 입력한다.
 3. 검증된 외부 provider id가 있으면 `matchStrategy: "external_id"`를 사용한다.
-4. 일반 음식이면 `matchStrategy: "provider_search"`를 사용하고 검증된 provider search term을 넣는다.
-5. 외부 provider에서 정확한 메뉴를 찾을 수 없고 독립 공식 출처가 있으면 `matchStrategy: "curated_nutrition"`을 사용한다.
+4. 일반 음식이면 `matchStrategy: "provider_search"`를 사용한다. 검증된 provider search term만 넣고, 검증 전에는 `searchTerms: []`로 둔다.
+5. 외부 provider 경로가 부적합하다고 확인되고 독립 공식 출처가 있으면 `matchStrategy: "curated_nutrition"`을 사용한다. Premier KR 승인 대기 중인 항목은 이 단계로 확정하지 않는다.
 6. FatSecret `sourceFoodId/sourceServingId`는 수동 검증 전까지 `null`로 둔다.
 7. FatSecret 영양 payload를 catalog JSON에 복제하지 않는다.
 8. 확인되지 않은 curated nutrition field는 `null`로 둔다.
@@ -138,7 +138,7 @@ Catalog load 시 다음을 검사한다.
 - malformed externalRefs
 - unknown provider
 - `external_id`인데 provider ref가 전혀 없는 상태
-- `provider_search`인데 searchTerms가 없는 상태
+- `provider_search`인데 provider ref가 전혀 없는 상태
 - sourceServingId가 있는데 sourceFoodId가 없는 상태
 - `curated_nutrition`인데 nutrition, nutritionSource, verificationStatus가 없는 상태
 - nutrition 숫자가 finite non-negative number 또는 `null`이 아닌 상태
@@ -146,19 +146,26 @@ Catalog load 시 다음을 검사한다.
 - invalid verificationStatus
 - non-curated item에 nutrition/source/status field가 들어간 상태
 
-Starter brand menu처럼 FatSecret id가 아직 검증되지 않은 항목은 provider ref를 유지하되 `sourceFoodId/sourceServingId`를 `null`, `searchTerms`를 empty로 둘 수 있다.
+Starter brand menu나 pending provider_search seed처럼 FatSecret link/search term이 아직 검증되지 않은 항목은 provider ref를 유지하되 `sourceFoodId/sourceServingId`를 `null`, `searchTerms`를 empty로 둘 수 있다.
 
 ## 현재 Starter Catalog
 
-브랜드 exact-link 후보:
+브랜드 routing 검증 대기 항목:
 
 - BHC 뿌링클
 - BHC 콰삭킹
 - BHC 맛초킹
 - 교촌 허니콤보
+- 교촌 레드콤보
+- 교촌 오리지날
 - 굽네 고추바사삭
+- 굽네 오리지널
+- 굽네 볼케이노
 - 지코바 숯불양념치킨
 - 동대문엽기떡볶이 엽기떡볶이
+- 동대문엽기떡볶이 로제떡볶이
+- 동대문엽기떡볶이 마라떡볶이
+- 신전떡볶이 떡볶이
 
 일반 provider search 음식:
 
@@ -173,8 +180,12 @@ Starter brand menu처럼 FatSecret id가 아직 검증되지 않은 항목은 pr
 - 떡볶이
 - 순대
 - 김밥
+- 냉면
+- 삼겹살
+- 보쌈
+- 족발
 
-현재 BHC 콰삭킹은 FatSecret Basic에서 `Kwasakking`, `BHC Kwasakking` 검색이 관련 없는 후보를 반환했으므로 `sourceFoodId`를 설정하지 않는다. 공식/검증 가능한 영양 출처가 확보되기 전까지 `curated_nutrition`으로도 전환하지 않는다.
+현재 브랜드 메뉴 14개는 identity/canonicalName/brand/aliases만 등록된 `NEEDS_VERIFICATION` 상태다. Schema v1에서는 `matchStrategy: "external_id"`와 empty FatSecret ref로 저장하지만, `sourceFoodId`, `sourceServingId`, Basic `searchTerms`, nutrition은 모두 검증되지 않았다. Premier Free + South Korea localized dataset 접근 승인이 대기 중이므로, 승인 결과 전에는 `VERIFIED_EXTERNAL_ID`나 `curated_nutrition`으로 확정하지 않는다. BHC 콰삭킹은 Basic diagnostic에서 `Kwasakking`은 후보 없음, `BHC Kwasakking`은 Buc-ee's/BHU 계열 오매칭이 관찰되어 `sourceFoodId`를 설정하지 않는다.
 
 ## FatSecret Link Diagnostic
 

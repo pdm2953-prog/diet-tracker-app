@@ -55,18 +55,21 @@ def test_resolve_inspection_targets_resolves_catalog_alias() -> None:
     assert targets[0].item.id == "kwasakking"
 
 
-def test_resolve_inspection_targets_rejects_provider_search_item() -> None:
+def test_resolve_inspection_targets_accepts_provider_search_item() -> None:
     catalog = KoreanFoodCatalog.from_mapping({
         "version": 1,
         "items": [provider_search_item("generic-food")],
     })
 
-    with pytest.raises(script.DiagnosticError, match="external_id"):
-        script.resolve_inspection_targets(
-            catalog,
-            query="김치찌개",
-            include_pending=False,
-        )
+    targets = script.resolve_inspection_targets(
+        catalog,
+        query="김치찌개",
+        include_pending=False,
+    )
+
+    assert len(targets) == 1
+    assert targets[0].item.id == "generic-food"
+    assert targets[0].item.match_strategy == "provider_search"
 
 
 def test_resolve_diagnostic_search_terms_prefers_cli_override_without_mutating_catalog_ref() -> None:

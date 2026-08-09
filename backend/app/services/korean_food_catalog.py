@@ -237,16 +237,9 @@ def _parse_catalog_item(raw_item: Any, index: int) -> KoreanFoodCatalogItem:
     nutrition_source = _parse_nutrition_source(raw_item.get("nutritionSource"), context)
     verification_status = _parse_verification_status(raw_item.get("verificationStatus"), context)
 
-    if match_strategy == "external_id" and len(external_refs) == 0:
+    if match_strategy in ("external_id", "provider_search") and len(external_refs) == 0:
         raise KoreanFoodCatalogValidationError(
-            f"{context}.externalRefs must include at least one provider for external_id."
-        )
-
-    if match_strategy == "provider_search" and not any(
-        external_ref.has_search_terms for external_ref in external_refs
-    ):
-        raise KoreanFoodCatalogValidationError(
-            f"{context}.externalRefs requires searchTerms for provider_search."
+            f"{context}.externalRefs must include at least one provider for {match_strategy}."
         )
 
     if match_strategy == "curated_nutrition":

@@ -22,6 +22,52 @@ def test_starter_catalog_resolves_brand_aliases_to_same_entry() -> None:
     assert kwasakking_ids == {"kr-bhc-kwasakking"}
 
 
+def test_starter_catalog_brand_audit_targets_are_pending_external_id() -> None:
+    catalog = KoreanFoodCatalog.from_catalog_file()
+    expected_items = {
+        "뿌링클": ("kr-bhc-bburinkle", "뿌링클", "BHC"),
+        "콰삭킹": ("kr-bhc-kwasakking", "콰삭킹", "BHC"),
+        "맛초킹": ("kr-bhc-macho-king", "맛초킹", "BHC"),
+        "교촌 허니콤보": ("kr-kyochon-honey-combo", "허니콤보", "교촌"),
+        "교촌 레드콤보": ("kr-kyochon-red-combo", "레드콤보", "교촌"),
+        "교촌오리지날": ("kr-kyochon-original", "교촌오리지날", "교촌"),
+        "굽네 고추바사삭": ("kr-goobne-gochubasasak", "고추바사삭", "굽네"),
+        "굽네오리지널": ("kr-goobne-original", "굽네 오리지널", "굽네"),
+        "굽네 볼케이노": ("kr-goobne-volcano", "볼케이노", "굽네"),
+        "지코바 숯불양념치킨": (
+            "kr-zigova-charcoal-yangnyeom-chicken",
+            "숯불양념치킨",
+            "지코바",
+        ),
+        "엽떡": ("kr-dongdaemun-yeopgi-tteokbokki", "엽기떡볶이", "동대문엽기떡볶이"),
+        "엽떡 로제": (
+            "kr-dongdaemun-yeopgi-rose-tteokbokki",
+            "로제떡볶이",
+            "동대문엽기떡볶이",
+        ),
+        "엽떡 마라": (
+            "kr-dongdaemun-yeopgi-mara-tteokbokki",
+            "마라떡볶이",
+            "동대문엽기떡볶이",
+        ),
+        "신전 떡볶이": ("kr-sinjeon-tteokbokki", "신전떡볶이", "신전떡볶이"),
+    }
+
+    for query, (catalog_id, canonical_name, brand_name) in expected_items.items():
+        item = catalog.resolve(query)
+
+        assert item is not None
+        assert item.id == catalog_id
+        assert item.canonical_name == canonical_name
+        assert item.brand_name == brand_name
+        assert item.match_strategy == "external_id"
+        assert item.external_refs[0].source_food_id is None
+        assert item.external_refs[0].source_serving_id is None
+        assert item.external_refs[0].search_terms == ()
+        assert item.nutrition is None
+        assert item.nutrition_source is None
+        assert item.verification_status is None
+
 def test_starter_catalog_keeps_kwasakking_unverified_without_source_food_id() -> None:
     catalog = KoreanFoodCatalog.from_catalog_file()
 
@@ -49,7 +95,37 @@ def test_starter_catalog_resolves_yeopddeok_and_generic_food() -> None:
     assert kimchi_jjigae is not None
     assert kimchi_jjigae.id == "kr-generic-kimchi-jjigae"
     assert kimchi_jjigae.match_strategy == "provider_search"
-    assert kimchi_jjigae.external_refs[0].search_terms == ("kimchi stew",)
+    assert kimchi_jjigae.external_refs[0].search_terms == ("kimchi jjigae",)
+
+
+def test_starter_catalog_provider_search_seed_terms_are_verified_or_pending() -> None:
+    catalog = KoreanFoodCatalog.from_catalog_file()
+    expected_terms = {
+        "김치찌개": ("kimchi jjigae",),
+        "된장찌개": (),
+        "순두부찌개": (),
+        "부대찌개": (),
+        "제육볶음": (),
+        "불고기": ("bulgogi",),
+        "비빔밥": ("bibimbap",),
+        "김치볶음밥": ("kimchi fried rice",),
+        "떡볶이": ("tteokbokki",),
+        "순대": (),
+        "김밥": ("gimbap",),
+        "냉면": ("cold noodles",),
+        "삼겹살": (),
+        "보쌈": (),
+        "족발": (),
+    }
+
+    for query, search_terms in expected_terms.items():
+        item = catalog.resolve(query)
+
+        assert item is not None
+        assert item.match_strategy == "provider_search"
+        assert item.external_refs[0].source_food_id is None
+        assert item.external_refs[0].source_serving_id is None
+        assert item.external_refs[0].search_terms == search_terms
 
 
 def test_catalog_parses_curated_nutrition_and_source_metadata() -> None:
@@ -128,11 +204,24 @@ def test_catalog_validation_rejects_alias_collision() -> None:
         })
 
 
-def test_catalog_validation_rejects_provider_search_without_search_terms() -> None:
+def test_catalog_validation_allows_pending_provider_search_without_search_terms() -> None:
     item = valid_external_id_item("generic-a", "일반음식", ["일반음식"])
     item["matchStrategy"] = "provider_search"
 
-    with pytest.raises(KoreanFoodCatalogValidationError, match="searchTerms"):
+    catalog = KoreanFoodCatalog.from_mapping({"version": 1, "items": [item]})
+    resolved = catalog.resolve("일반음식")
+
+    assert resolved is not None
+    assert resolved.match_strategy == "provider_search"
+    assert resolved.external_refs[0].search_terms == ()
+
+
+def test_catalog_validation_rejects_provider_search_without_external_refs() -> None:
+    item = valid_external_id_item("generic-a", "일반음식", ["일반음식"])
+    item["matchStrategy"] = "provider_search"
+    item["externalRefs"] = []
+
+    with pytest.raises(KoreanFoodCatalogValidationError, match="externalRefs"):
         KoreanFoodCatalog.from_mapping({"version": 1, "items": [item]})
 
 

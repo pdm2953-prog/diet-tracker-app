@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 
 from app.models.food import FoodSearchRecord
 from app.providers.interfaces import (
@@ -201,6 +201,33 @@ def test_external_id_pending_does_not_auto_search_or_link_candidates() -> None:
     assert result.query.resolved == "콰삭킹"
 
 
+def test_starter_pending_brand_items_return_safe_empty_without_provider_calls() -> None:
+    provider = RecordingFoodProvider()
+    service = FoodSearchService(
+        provider,
+        KoreanFoodAliasTranslator.from_alias_file(),
+        korean_food_catalog=KoreanFoodCatalog.from_catalog_file(),
+    )
+    expected_resolutions = {
+        "뿌링클": "뿌링클",
+        "콰삭킹": "콰삭킹",
+        "허니콤보": "허니콤보",
+    }
+
+    for query, expected_resolved in expected_resolutions.items():
+        provider.get_calls.clear()
+        provider.search_calls.clear()
+
+        result = run(service.search_foods(query, 1, 20))
+
+        assert provider.get_calls == []
+        assert provider.search_calls == []
+        assert result.items == []
+        assert result.query is not None
+        assert result.query.status == "unresolved"
+        assert result.query.translator_name == "korean_food_catalog"
+        assert result.query.resolved == expected_resolved
+
 def test_provider_search_uses_catalog_search_terms_without_exposing_query_metadata() -> None:
     provider = RecordingFoodProvider()
     service = FoodSearchService(
@@ -216,6 +243,25 @@ def test_provider_search_uses_catalog_search_terms_without_exposing_query_metada
     assert result.items[0].canonical_name == "김치찌개"
     assert result.items[0].category == "찌개"
     assert result.items[0].source_food_name == "Kimchi Stew"
+
+
+def test_provider_search_pending_without_search_terms_does_not_call_provider() -> None:
+    provider = RecordingFoodProvider()
+    service = FoodSearchService(
+        provider,
+        KoreanFoodAliasTranslator.from_alias_file(),
+        korean_food_catalog=make_provider_search_catalog(search_terms=[]),
+    )
+
+    result = run(service.search_foods("김치찌개", 1, 20))
+
+    assert provider.get_calls == []
+    assert provider.search_calls == []
+    assert result.items == []
+    assert result.query is not None
+    assert result.query.status == "unresolved"
+    assert result.query.translator_name == "korean_food_catalog"
+    assert result.query.resolved == "김치찌개"
 
 
 def test_catalog_hit_without_provider_route_keeps_safe_unresolved_policy() -> None:
@@ -339,7 +385,7 @@ def make_external_catalog(
     })
 
 
-def make_provider_search_catalog() -> KoreanFoodCatalog:
+def make_provider_search_catalog(search_terms: list[str] | None = None) -> KoreanFoodCatalog:
     return KoreanFoodCatalog.from_mapping({
         "version": 1,
         "items": [
@@ -355,7 +401,7 @@ def make_provider_search_catalog() -> KoreanFoodCatalog:
                         "provider": "fatsecret",
                         "sourceFoodId": None,
                         "sourceServingId": None,
-                        "searchTerms": ["kimchi stew"],
+                        "searchTerms": ["kimchi stew"] if search_terms is None else search_terms,
                     }
                 ],
             }

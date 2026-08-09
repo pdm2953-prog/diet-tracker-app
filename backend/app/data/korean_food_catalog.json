@@ -146,6 +146,149 @@
       ]
     },
     {
+      "id": "kr-kyochon-red-combo",
+      "canonicalName": "레드콤보",
+      "brandName": "교촌",
+      "category": "치킨",
+      "aliases": [
+        "레드콤보",
+        "교촌 레드콤보",
+        "교촌치킨 레드콤보"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-kyochon-original",
+      "canonicalName": "교촌오리지날",
+      "brandName": "교촌",
+      "category": "치킨",
+      "aliases": [
+        "교촌오리지날",
+        "교촌 오리지날",
+        "교촌치킨 오리지날"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-goobne-original",
+      "canonicalName": "굽네 오리지널",
+      "brandName": "굽네",
+      "category": "치킨",
+      "aliases": [
+        "굽네 오리지널",
+        "굽네오리지널",
+        "굽네치킨 오리지널",
+        "굽네 오리지날",
+        "굽네오리지날",
+        "굽네치킨 오리지날"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-goobne-volcano",
+      "canonicalName": "볼케이노",
+      "brandName": "굽네",
+      "category": "치킨",
+      "aliases": [
+        "볼케이노",
+        "굽네 볼케이노",
+        "굽네치킨 볼케이노"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-dongdaemun-yeopgi-rose-tteokbokki",
+      "canonicalName": "로제떡볶이",
+      "brandName": "동대문엽기떡볶이",
+      "category": "분식",
+      "aliases": [
+        "엽떡 로제",
+        "엽떡 로제떡볶이",
+        "동대문엽기떡볶이 로제떡볶이"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-dongdaemun-yeopgi-mara-tteokbokki",
+      "canonicalName": "마라떡볶이",
+      "brandName": "동대문엽기떡볶이",
+      "category": "분식",
+      "aliases": [
+        "엽떡 마라",
+        "엽떡 마라떡볶이",
+        "동대문엽기떡볶이 마라떡볶이"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-sinjeon-tteokbokki",
+      "canonicalName": "신전떡볶이",
+      "brandName": "신전떡볶이",
+      "category": "분식",
+      "aliases": [
+        "신전떡볶이",
+        "신전 떡볶이",
+        "신전떡볶이 떡볶이"
+      ],
+      "matchStrategy": "external_id",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
       "id": "kr-generic-kimchi-jjigae",
       "canonicalName": "김치찌개",
       "brandName": null,
@@ -161,7 +304,7 @@
           "sourceFoodId": null,
           "sourceServingId": null,
           "searchTerms": [
-            "kimchi stew"
+            "kimchi jjigae"
           ]
         }
       ]
@@ -181,9 +324,7 @@
           "provider": "fatsecret",
           "sourceFoodId": null,
           "sourceServingId": null,
-          "searchTerms": [
-            "doenjang jjigae"
-          ]
+          "searchTerms": []
         }
       ]
     },
@@ -202,9 +343,7 @@
           "provider": "fatsecret",
           "sourceFoodId": null,
           "sourceServingId": null,
-          "searchTerms": [
-            "soondubu jjigae"
-          ]
+          "searchTerms": []
         }
       ]
     },
@@ -223,9 +362,7 @@
           "provider": "fatsecret",
           "sourceFoodId": null,
           "sourceServingId": null,
-          "searchTerms": [
-            "budae jjigae"
-          ]
+          "searchTerms": []
         }
       ]
     },
@@ -244,9 +381,7 @@
           "provider": "fatsecret",
           "sourceFoodId": null,
           "sourceServingId": null,
-          "searchTerms": [
-            "jeyuk bokkeum"
-          ]
+          "searchTerms": []
         }
       ]
     },
@@ -345,9 +480,7 @@
           "provider": "fatsecret",
           "sourceFoodId": null,
           "sourceServingId": null,
-          "searchTerms": [
-            "soondae"
-          ]
+          "searchTerms": []
         }
       ]
     },
@@ -368,6 +501,82 @@
           "searchTerms": [
             "gimbap"
           ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-naengmyeon",
+      "canonicalName": "냉면",
+      "brandName": null,
+      "category": "면류",
+      "aliases": [
+        "냉면"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": [
+            "cold noodles"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-samgyeopsal",
+      "canonicalName": "삼겹살",
+      "brandName": null,
+      "category": "구이",
+      "aliases": [
+        "삼겹살",
+        "돼지삼겹살",
+        "돼지 삼겹살"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-bossam",
+      "canonicalName": "보쌈",
+      "brandName": null,
+      "category": "한식",
+      "aliases": [
+        "보쌈"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
+        }
+      ]
+    },
+    {
+      "id": "kr-generic-jokbal",
+      "canonicalName": "족발",
+      "brandName": null,
+      "category": "한식",
+      "aliases": [
+        "족발"
+      ],
+      "matchStrategy": "provider_search",
+      "externalRefs": [
+        {
+          "provider": "fatsecret",
+          "sourceFoodId": null,
+          "sourceServingId": null,
+          "searchTerms": []
         }
       ]
     }
