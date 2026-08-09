@@ -58,6 +58,23 @@ test('calculateNutritionForConsumedGrams scales nutrition up for 150g of a 100g 
   assert.equal(result.fatG, 6);
 });
 
+test('calculateNutritionForConsumedGrams scales 75g from a 150g curated serving basis', () => {
+  const curatedServingNutrition: Nutrition = {
+    ...baseNutrition,
+    caloriesKcal: 360,
+    carbohydrateG: 45,
+    proteinG: 30,
+    fatG: 12,
+  };
+
+  const result = calculateNutritionForConsumedGrams(curatedServingNutrition, 75, 150);
+
+  assert.equal(result.caloriesKcal, 180);
+  assert.equal(result.carbohydrateG, 22.5);
+  assert.equal(result.proteinG, 15);
+  assert.equal(result.fatG, 6);
+});
+
 test('calculateNutritionForConsumedGrams preserves null fields and keeps real zero values', () => {
   const result = calculateNutritionForConsumedGrams(baseNutrition, 50, 100);
 

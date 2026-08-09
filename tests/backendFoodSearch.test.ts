@@ -165,6 +165,7 @@ test('adaptBackendFoodSearchItem preserves provider-neutral catalog metadata', (
     assert.equal(food.brandName, 'BHC');
   }
 });
+
 test('adaptBackendFoodSearchItem preserves curated nutrition metadata and null values', () => {
   const parsedResponse = parseBackendFoodSearchResponse({
     items: [{
@@ -188,7 +189,7 @@ test('adaptBackendFoodSearchItem preserves curated nutrition metadata and null v
         name: 'BHC 공식 영양정보',
         url: 'https://example.test/bhc',
         recordId: 'bhc-kwasakking',
-        checkedAt: '2026-08-09',
+        checkedAt: '2026-08-10',
       },
       verificationStatus: 'reviewed',
     }],
@@ -214,11 +215,79 @@ test('adaptBackendFoodSearchItem preserves curated nutrition metadata and null v
       name: 'BHC 공식 영양정보',
       url: 'https://example.test/bhc',
       recordId: 'bhc-kwasakking',
-      checkedAt: '2026-08-09',
+      checkedAt: '2026-08-10',
     });
     assert.equal(food.verificationStatus, 'reviewed');
   }
 });
+
+test('adaptBackendFoodSearchItem maps official soondubu curated nutrition result', () => {
+  const parsedResponse = parseBackendFoodSearchResponse({
+    items: [{
+      ...backendFoodDto,
+      id: 'curated-kr-generic-soondubu-jjigae',
+      name: '순두부찌개',
+      displayName: '순두부찌개',
+      dataSource: 'curated',
+      sourceFoodId: 'kr-generic-soondubu-jjigae',
+      sourceFoodName: '순두부찌개',
+      brandName: null,
+      category: '찌개',
+      catalogId: 'kr-generic-soondubu-jjigae',
+      canonicalName: '순두부찌개',
+      servingSize: 400,
+      servingUnit: 'g',
+      nutritionPerServing: {
+        caloriesKcal: 200,
+        proteinG: 14,
+        carbsG: 8,
+        fatG: 12,
+      },
+      nutritionSource: {
+        type: 'mfds',
+        name: '식품안전나라',
+        url: 'https://www.foodsafetykorea.go.kr/portal/board/boardDetail.do?bbs_no=bbs039&menu_grp=MENU_NEW03&menu_no=4847&ntctxt_no=22493',
+        recordId: null,
+        checkedAt: '2026-08-10',
+      },
+      verificationStatus: 'official',
+    }],
+    page: 1,
+    pageSize: 20,
+    hasMore: false,
+  });
+
+  assert.equal(parsedResponse !== null, true);
+
+  if (parsedResponse !== null) {
+    const food = adaptBackendFoodSearchItem(parsedResponse.items[0], {
+      updatedAt: '2026-08-09T00:00:00.000Z',
+    });
+
+    assert.equal(food.id, 'curated-kr-generic-soondubu-jjigae');
+    assert.equal(food.displayName, '순두부찌개');
+    assert.equal(food.canonicalName, '순두부찌개');
+    assert.equal(food.catalogId, 'kr-generic-soondubu-jjigae');
+    assert.equal(food.brandName, null);
+    assert.equal(food.category, '찌개');
+    assert.equal(food.dataSource, 'curated');
+    assert.equal(food.servingSize, 400);
+    assert.equal(food.servingUnit, 'g');
+    assert.equal(food.nutritionPerServing.caloriesKcal, 200);
+    assert.equal(food.nutritionPerServing.carbohydrateG, 8);
+    assert.equal(food.nutritionPerServing.proteinG, 14);
+    assert.equal(food.nutritionPerServing.fatG, 12);
+    assert.deepEqual(food.nutritionSource, {
+      type: 'mfds',
+      name: '식품안전나라',
+      url: 'https://www.foodsafetykorea.go.kr/portal/board/boardDetail.do?bbs_no=bbs039&menu_grp=MENU_NEW03&menu_no=4847&ntctxt_no=22493',
+      recordId: null,
+      checkedAt: '2026-08-10',
+    });
+    assert.equal(food.verificationStatus, 'official');
+  }
+});
+
 test('parseBackendFoodSearchResponse preserves extensible backend dataSource values', () => {
   const dataSources = ['database', 'curated', 'future-provider.v2'];
 

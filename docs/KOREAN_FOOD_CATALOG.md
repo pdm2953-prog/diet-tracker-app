@@ -167,7 +167,7 @@ Starter brand menu나 pending provider_search seed처럼 FatSecret link/search t
 - 동대문엽기떡볶이 마라떡볶이
 - 신전떡볶이 떡볶이
 
-일반 provider search 음식:
+일반 음식 seed:
 
 - 김치찌개
 - 된장찌개
@@ -186,6 +186,10 @@ Starter brand menu나 pending provider_search seed처럼 FatSecret link/search t
 - 족발
 
 현재 브랜드 메뉴 14개는 identity/canonicalName/brand/aliases만 등록된 `NEEDS_VERIFICATION` 상태다. Schema v1에서는 `matchStrategy: "external_id"`와 empty FatSecret ref로 저장하지만, `sourceFoodId`, `sourceServingId`, Basic `searchTerms`, nutrition은 모두 검증되지 않았다. Premier Free + South Korea localized dataset 접근 승인이 대기 중이므로, 승인 결과 전에는 `VERIFIED_EXTERNAL_ID`나 `curated_nutrition`으로 확정하지 않는다. BHC 콰삭킹은 Basic diagnostic에서 `Kwasakking`은 후보 없음, `BHC Kwasakking`은 Buc-ee's/BHU 계열 오매칭이 관찰되어 `sourceFoodId`를 설정하지 않는다.
+현재 curated nutrition seed:
+
+- 순두부찌개: 식품안전나라 `외식 시 열량을 참고하세요 (기준: 1인분)` 공식 값, 400 g 기준, `verificationStatus: "official"`. 원본 400 g 기준을 보존하고 frontend gram scaling으로 200 g, 100 g, 75 g 등을 계산한다.
+
 
 ## FatSecret Link Diagnostic
 

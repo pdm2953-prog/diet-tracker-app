@@ -232,3 +232,49 @@ test('addFoodToMeals keeps FatSecret metadata food selectable with gram input', 
   assert.equal(mealFood.calculatedNutrition.caloriesKcal, 300);
   assert.equal(mealFood.calculatedNutrition.carbohydrateG, 75);
 });
+
+test('addFoodToMeals adds official soondubu curated food and scales 200g from 400g serving', () => {
+  const soondubu = makeFood({
+    id: 'curated-kr-generic-soondubu-jjigae',
+    sourceFoodId: 'kr-generic-soondubu-jjigae',
+    sourceFoodName: '순두부찌개',
+    name: '순두부찌개',
+    displayName: '순두부찌개',
+    dataSource: 'curated',
+    category: '찌개',
+    catalogId: 'kr-generic-soondubu-jjigae',
+    canonicalName: '순두부찌개',
+    servingSize: 400,
+    servingUnit: 'g',
+    servingDescription: '400 g',
+    nutritionPerServing: makeNutrition({
+      caloriesKcal: 200,
+      carbohydrateG: 8,
+      proteinG: 14,
+      fatG: 12,
+    }),
+    nutritionSource: {
+      type: 'mfds',
+      name: '식품안전나라',
+      url: 'https://www.foodsafetykorea.go.kr/portal/board/boardDetail.do?bbs_no=bbs039&menu_grp=MENU_NEW03&menu_no=4847&ntctxt_no=22493',
+      recordId: null,
+      checkedAt: '2026-08-10',
+    },
+    verificationStatus: 'official',
+  });
+  const meals = [makeMeal('breakfast', [])];
+
+  const updatedMeals = addFoodToMeals(meals, soondubu, 'breakfast', 200, {
+    createMealFoodId: (foodId) => `created-${foodId}`,
+    updatedAt: '2026-08-09T01:00:00.000Z',
+  });
+
+  const mealFood = updatedMeals[0].foods[0];
+
+  assert.equal(mealFood.foodId, 'curated-kr-generic-soondubu-jjigae');
+  assert.equal(mealFood.consumedGrams, 200);
+  assert.equal(mealFood.calculatedNutrition.caloriesKcal, 100);
+  assert.equal(mealFood.calculatedNutrition.carbohydrateG, 4);
+  assert.equal(mealFood.calculatedNutrition.proteinG, 7);
+  assert.equal(mealFood.calculatedNutrition.fatG, 6);
+});

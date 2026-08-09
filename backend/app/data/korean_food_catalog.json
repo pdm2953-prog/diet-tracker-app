@@ -337,15 +337,24 @@
         "순두부찌개",
         "순두부 찌개"
       ],
-      "matchStrategy": "provider_search",
-      "externalRefs": [
-        {
-          "provider": "fatsecret",
-          "sourceFoodId": null,
-          "sourceServingId": null,
-          "searchTerms": []
-        }
-      ]
+      "matchStrategy": "curated_nutrition",
+      "externalRefs": [],
+      "nutrition": {
+        "servingSize": 400,
+        "servingUnit": "g",
+        "caloriesKcal": 200,
+        "proteinG": 14,
+        "carbsG": 8,
+        "fatG": 12
+      },
+      "nutritionSource": {
+        "type": "mfds",
+        "name": "식품안전나라",
+        "url": "https://www.foodsafetykorea.go.kr/portal/board/boardDetail.do?bbs_no=bbs039&menu_grp=MENU_NEW03&menu_no=4847&ntctxt_no=22493",
+        "recordId": null,
+        "checkedAt": "2026-08-10"
+      },
+      "verificationStatus": "official"
     },
     {
       "id": "kr-generic-budae-jjigae",

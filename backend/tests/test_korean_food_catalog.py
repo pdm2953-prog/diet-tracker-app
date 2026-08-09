@@ -68,6 +68,7 @@ def test_starter_catalog_brand_audit_targets_are_pending_external_id() -> None:
         assert item.nutrition_source is None
         assert item.verification_status is None
 
+
 def test_starter_catalog_keeps_kwasakking_unverified_without_source_food_id() -> None:
     catalog = KoreanFoodCatalog.from_catalog_file()
 
@@ -103,7 +104,6 @@ def test_starter_catalog_provider_search_seed_terms_are_verified_or_pending() ->
     expected_terms = {
         "김치찌개": ("kimchi jjigae",),
         "된장찌개": (),
-        "순두부찌개": (),
         "부대찌개": (),
         "제육볶음": (),
         "불고기": ("bulgogi",),
@@ -126,6 +126,35 @@ def test_starter_catalog_provider_search_seed_terms_are_verified_or_pending() ->
         assert item.external_refs[0].source_food_id is None
         assert item.external_refs[0].source_serving_id is None
         assert item.external_refs[0].search_terms == search_terms
+
+
+def test_starter_catalog_soondubu_jjigae_has_official_curated_nutrition() -> None:
+    catalog = KoreanFoodCatalog.from_catalog_file()
+
+    item = catalog.resolve("순두부찌개")
+
+    assert item is not None
+    assert item.id == "kr-generic-soondubu-jjigae"
+    assert item.match_strategy == "curated_nutrition"
+    assert item.external_refs == ()
+    assert item.has_usable_curated_nutrition is True
+    assert item.nutrition is not None
+    assert item.nutrition.serving_size == 400
+    assert item.nutrition.serving_unit == "g"
+    assert item.nutrition.calories_kcal == 200
+    assert item.nutrition.carbs_g == 8
+    assert item.nutrition.protein_g == 14
+    assert item.nutrition.fat_g == 12
+    assert item.nutrition_source is not None
+    assert item.nutrition_source.source_type == "mfds"
+    assert item.nutrition_source.name == "식품안전나라"
+    assert item.nutrition_source.url == (
+        "https://www.foodsafetykorea.go.kr/portal/board/boardDetail.do?"
+        "bbs_no=bbs039&menu_grp=MENU_NEW03&menu_no=4847&ntctxt_no=22493"
+    )
+    assert item.nutrition_source.record_id is None
+    assert item.nutrition_source.checked_at == "2026-08-10"
+    assert item.verification_status == "official"
 
 
 def test_catalog_parses_curated_nutrition_and_source_metadata() -> None:
@@ -152,7 +181,7 @@ def test_catalog_parses_curated_nutrition_and_source_metadata() -> None:
     assert item.nutrition_source.name == "BHC 공식 영양정보"
     assert item.nutrition_source.url == "https://example.test/bhc"
     assert item.nutrition_source.record_id == "bhc-test-chicken"
-    assert item.nutrition_source.checked_at == "2026-08-09"
+    assert item.nutrition_source.checked_at == "2026-08-10"
     assert item.verification_status == "official"
 
 
@@ -184,6 +213,8 @@ def test_curated_nutrition_needs_verification_is_not_usable() -> None:
         ),
     ],
 )
+
+
 def test_catalog_validation_rejects_malformed_entries(mutate, message: str) -> None:
     item_a = valid_external_id_item("duplicate-id", "테스트A", ["테스트A"])
     item_b = valid_external_id_item("other-id", "테스트B", ["테스트B"])
@@ -249,6 +280,8 @@ def test_catalog_validation_rejects_provider_search_without_external_refs() -> N
         ),
     ],
 )
+
+
 def test_catalog_validation_rejects_malformed_curated_nutrition(mutate, message: str) -> None:
     item = valid_curated_nutrition_item()
     mutate(item)
@@ -317,7 +350,7 @@ def valid_curated_nutrition_item() -> dict[str, object]:
             "name": "BHC 공식 영양정보",
             "url": "https://example.test/bhc",
             "recordId": "bhc-test-chicken",
-            "checkedAt": "2026-08-09",
+            "checkedAt": "2026-08-10",
         },
         "verificationStatus": "official",
     }

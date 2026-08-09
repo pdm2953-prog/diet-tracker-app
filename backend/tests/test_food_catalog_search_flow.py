@@ -98,7 +98,7 @@ def test_curated_nutrition_returns_catalog_record_without_provider_call() -> Non
     assert item.nutrition_source.name == "BHC 공식 영양정보"
     assert item.nutrition_source.url == "https://example.test/bhc"
     assert item.nutrition_source.record_id == "bhc-test-chicken"
-    assert item.nutrition_source.checked_at == "2026-08-09"
+    assert item.nutrition_source.checked_at == "2026-08-10"
     assert item.verification_status == "official"
 
 
@@ -144,6 +144,99 @@ def test_curated_nutrition_needs_verification_does_not_return_unverified_values(
     assert result.query is not None
     assert result.query.status == "unresolved"
     assert result.query.translator_name == "korean_food_catalog"
+
+
+def test_curated_nutrition_estimated_does_not_return_unverified_values() -> None:
+    provider = RecordingFoodProvider()
+    service = FoodSearchService(
+        provider,
+        KoreanFoodAliasTranslator.from_alias_file(),
+        korean_food_catalog=make_curated_catalog(verification_status="estimated"),
+    )
+
+    result = run(service.search_foods("테스트치킨", 1, 20))
+
+    assert provider.get_calls == []
+    assert provider.search_calls == []
+    assert result.items == []
+    assert result.query is not None
+    assert result.query.status == "unresolved"
+    assert result.query.translator_name == "korean_food_catalog"
+
+
+def test_curated_nutrition_keeps_original_gram_serving_basis() -> None:
+    provider = RecordingFoodProvider()
+    service = FoodSearchService(
+        provider,
+        KoreanFoodAliasTranslator.from_alias_file(),
+        korean_food_catalog=make_curated_catalog(
+            serving_size=150,
+            calories_kcal=360,
+            protein_g=30,
+            carbs_g=45,
+            fat_g=12,
+            verification_status="reviewed",
+        ),
+    )
+
+    result = run(service.search_foods("테스트치킨", 1, 20))
+
+    assert provider.get_calls == []
+    assert provider.search_calls == []
+    item = result.items[0]
+    assert item.serving_description == "150 g"
+    assert item.serving_size == 150
+    assert item.serving_unit == "g"
+    assert item.calories_kcal == 360
+    assert item.protein_g == 30
+    assert item.carbs_g == 45
+    assert item.fat_g == 12
+    assert item.verification_status == "reviewed"
+
+
+def test_starter_soondubu_jjigae_returns_official_curated_result_without_provider_call() -> None:
+    provider = RecordingFoodProvider()
+    service = FoodSearchService(
+        provider,
+        KoreanFoodAliasTranslator.from_alias_file(),
+        korean_food_catalog=KoreanFoodCatalog.from_catalog_file(),
+    )
+
+    result = run(service.search_foods("순두부찌개", 1, 20))
+
+    assert provider.get_calls == []
+    assert provider.search_calls == []
+    assert result.query is None
+    assert result.has_more is False
+    assert result.page_size == 10
+
+    item = result.items[0]
+    assert item.id == "curated-kr-generic-soondubu-jjigae"
+    assert item.data_source == "curated"
+    assert item.source_food_id == "kr-generic-soondubu-jjigae"
+    assert item.source_food_name == "순두부찌개"
+    assert item.name == "순두부찌개"
+    assert item.brand_name is None
+    assert item.category == "찌개"
+    assert item.catalog_id == "kr-generic-soondubu-jjigae"
+    assert item.canonical_name == "순두부찌개"
+    assert item.serving_description == "400 g"
+    assert item.serving_size == 400
+    assert item.serving_unit == "g"
+    assert item.calories_kcal == 200
+    assert item.carbs_g == 8
+    assert item.protein_g == 14
+    assert item.fat_g == 12
+    assert item.nutrition_source is not None
+    assert item.nutrition_source.type == "mfds"
+    assert item.nutrition_source.name == "식품안전나라"
+    assert item.nutrition_source.url == (
+        "https://www.foodsafetykorea.go.kr/portal/board/boardDetail.do?"
+        "bbs_no=bbs039&menu_grp=MENU_NEW03&menu_no=4847&ntctxt_no=22493"
+    )
+    assert item.nutrition_source.record_id is None
+    assert item.nutrition_source.checked_at == "2026-08-10"
+    assert item.verification_status == "official"
 
 
 def test_external_id_with_source_food_id_uses_direct_lookup_before_search() -> None:
@@ -228,6 +321,7 @@ def test_starter_pending_brand_items_return_safe_empty_without_provider_calls() 
         assert result.query.translator_name == "korean_food_catalog"
         assert result.query.resolved == expected_resolved
 
+
 def test_provider_search_uses_catalog_search_terms_without_exposing_query_metadata() -> None:
     provider = RecordingFoodProvider()
     service = FoodSearchService(
@@ -284,6 +378,7 @@ def test_catalog_hit_without_provider_route_keeps_safe_unresolved_policy() -> No
     assert result.query.status == "unresolved"
     assert result.query.translator_name == "korean_food_catalog"
     assert result.query.resolved == "콰삭킹"
+
 
 def test_catalog_hit_without_verified_route_does_not_fall_through_for_english_alias() -> None:
     provider = RecordingFoodProvider()
@@ -411,6 +506,7 @@ def make_provider_search_catalog(search_terms: list[str] | None = None) -> Korea
 
 def make_curated_catalog(
     *,
+    serving_size: float = 100,
     calories_kcal: float | None = 250,
     protein_g: float | None = 21,
     carbs_g: float | None = 0,
@@ -429,7 +525,7 @@ def make_curated_catalog(
                 "matchStrategy": "curated_nutrition",
                 "externalRefs": [],
                 "nutrition": {
-                    "servingSize": 100,
+                    "servingSize": serving_size,
                     "servingUnit": "g",
                     "caloriesKcal": calories_kcal,
                     "proteinG": protein_g,
@@ -441,7 +537,7 @@ def make_curated_catalog(
                     "name": "BHC 공식 영양정보",
                     "url": "https://example.test/bhc",
                     "recordId": "bhc-test-chicken",
-                    "checkedAt": "2026-08-09",
+                    "checkedAt": "2026-08-10",
                 },
                 "verificationStatus": verification_status,
             }

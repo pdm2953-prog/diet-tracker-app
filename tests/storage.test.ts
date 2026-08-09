@@ -130,7 +130,7 @@ test('restoreAppDataSnapshot preserves curated nutrition source metadata', () =>
       name: '브랜드 공식 영양정보',
       url: 'https://example.test/official-nutrition',
       recordId: 'official-test-chicken',
-      checkedAt: '2026-08-09',
+      checkedAt: '2026-08-10',
     },
     verificationStatus: 'reviewed',
   };
@@ -153,6 +153,84 @@ test('restoreAppDataSnapshot preserves curated nutrition source metadata', () =>
   assert.deepEqual(restored.foods[0]?.nutritionSource, curatedFood.nutritionSource);
   assert.equal(restored.foods[0]?.verificationStatus, 'reviewed');
 });
+
+test('restoreAppDataSnapshot preserves official soondubu curated food and meal nutrition snapshot', () => {
+  const soondubuFood: Food = {
+    ...food,
+    id: 'curated-kr-generic-soondubu-jjigae',
+    sourceFoodId: 'kr-generic-soondubu-jjigae',
+    sourceFoodName: '순두부찌개',
+    name: '순두부찌개',
+    displayName: '순두부찌개',
+    brandName: null,
+    category: '찌개',
+    catalogId: 'kr-generic-soondubu-jjigae',
+    canonicalName: '순두부찌개',
+    dataSource: 'curated',
+    servingSize: 400,
+    servingUnit: 'g',
+    servingDescription: '400 g',
+    nutritionPerServing: makeNutrition({
+      caloriesKcal: 200,
+      carbohydrateG: 8,
+      proteinG: 14,
+      fatG: 12,
+    }),
+    nutritionSource: {
+      type: 'mfds',
+      name: '식품안전나라',
+      url: 'https://www.foodsafetykorea.go.kr/portal/board/boardDetail.do?bbs_no=bbs039&menu_grp=MENU_NEW03&menu_no=4847&ntctxt_no=22493',
+      recordId: null,
+      checkedAt: '2026-08-10',
+    },
+    verificationStatus: 'official',
+  };
+  const soondubuMeal: Meal = {
+    ...meal,
+    id: 'meal-2026-08-09-breakfast',
+    date: '2026-08-09',
+    foods: [{
+      ...meal.foods[0],
+      id: 'meal-food-soondubu',
+      foodId: soondubuFood.id,
+      mealId: 'meal-2026-08-09-breakfast',
+      consumedGrams: 200,
+      calculatedNutrition: makeNutrition({
+        caloriesKcal: 100,
+        carbohydrateG: 4,
+        proteinG: 7,
+        fatG: 6,
+      }),
+    }],
+  };
+  const data: AppDataSnapshot = {
+    fixedMealTemplates: [],
+    foods: [soondubuFood],
+    hiddenFixedMealSourceKeys: {},
+    mealsByDate: { '2026-08-09': [soondubuMeal] },
+    todayTargets: fallback.todayTargets,
+  };
+
+  const restored = restoreAppDataSnapshot(serializeAppDataSnapshot(data), fallback);
+  const restoredFood = restored.foods[0];
+  const restoredMealFood = restored.mealsByDate['2026-08-09']?.[0]?.foods[0];
+
+  assert.equal(restoredFood?.catalogId, 'kr-generic-soondubu-jjigae');
+  assert.equal(restoredFood?.canonicalName, '순두부찌개');
+  assert.equal(restoredFood?.dataSource, 'curated');
+  assert.equal(restoredFood?.servingSize, 400);
+  assert.equal(restoredFood?.nutritionPerServing.caloriesKcal, 200);
+  assert.equal(restoredFood?.nutritionPerServing.carbohydrateG, 8);
+  assert.deepEqual(restoredFood?.nutritionSource, soondubuFood.nutritionSource);
+  assert.equal(restoredFood?.verificationStatus, 'official');
+  assert.equal(restoredMealFood?.foodId, soondubuFood.id);
+  assert.equal(restoredMealFood?.consumedGrams, 200);
+  assert.equal(restoredMealFood?.calculatedNutrition.caloriesKcal, 100);
+  assert.equal(restoredMealFood?.calculatedNutrition.carbohydrateG, 4);
+  assert.equal(restoredMealFood?.calculatedNutrition.proteinG, 7);
+  assert.equal(restoredMealFood?.calculatedNutrition.fatG, 6);
+});
+
 test('restoreAppDataSnapshot preserves future dataSource values without dropping foods or meal rows', () => {
   const futureFood: Food = {
     ...food,
@@ -214,6 +292,7 @@ test('restoreAppDataSnapshot omits malformed dataSource without dropping stored 
   assert.equal(restored.foods[0]?.dataSource, undefined);
   assert.equal(restored.mealsByDate['2026-07-23']?.[0]?.foods[0]?.foodId, 'food-malformed-source');
 });
+
 test('restoreAppDataSnapshot falls back for invalid JSON and unsupported versions', () => {
   assert.equal(restoreAppDataSnapshot('{bad json', fallback), fallback);
   assert.equal(restoreAppDataSnapshot(JSON.stringify({ version: 999 }), fallback), fallback);

@@ -95,6 +95,8 @@ def test_food_search_validates_page_and_page_size() -> None:
         (50, 10),
     ],
 )
+
+
 def test_food_search_basic_provider_caps_page_size_and_returns_effective_value(
     requested_page_size: int,
     effective_page_size: int,
@@ -373,6 +375,47 @@ def test_food_search_response_uses_catalog_canonical_display_name_and_preserves_
     }
 
 
+def test_food_search_returns_official_soondubu_curated_catalog_result() -> None:
+    response = client.get("/api/v1/foods/search", params={"q": "순두부찌개"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["query"] is None
+    assert body["hasMore"] is False
+
+    item = body["items"][0]
+    assert item["id"] == "curated-kr-generic-soondubu-jjigae"
+    assert item["dataSource"] == "curated"
+    assert item["name"] == "순두부찌개"
+    assert item["displayName"] == "순두부찌개"
+    assert item["sourceFoodId"] == "kr-generic-soondubu-jjigae"
+    assert item["sourceFoodName"] == "순두부찌개"
+    assert item["brandName"] is None
+    assert item["category"] == "찌개"
+    assert item["catalogId"] == "kr-generic-soondubu-jjigae"
+    assert item["canonicalName"] == "순두부찌개"
+    assert item["servingSize"] == 400
+    assert item["servingUnit"] == "g"
+    assert item["servingDescription"] == "400 g"
+    assert item["nutritionPerServing"] == {
+        "caloriesKcal": 200,
+        "proteinG": 14,
+        "carbsG": 8,
+        "fatG": 12,
+    }
+    assert item["nutritionSource"] == {
+        "type": "mfds",
+        "name": "식품안전나라",
+        "url": (
+            "https://www.foodsafetykorea.go.kr/portal/board/boardDetail.do?"
+            "bbs_no=bbs039&menu_grp=MENU_NEW03&menu_no=4847&ntctxt_no=22493"
+        ),
+        "recordId": None,
+        "checkedAt": "2026-08-10",
+    }
+    assert item["verificationStatus"] == "official"
+
+
 def test_food_search_response_includes_curated_nutrition_metadata_and_preserves_nulls() -> None:
     class FakeFoodSearchService:
         async def search_foods(
@@ -406,7 +449,7 @@ def test_food_search_response_includes_curated_nutrition_metadata_and_preserves_
                             name="BHC 공식 영양정보",
                             url="https://example.test/bhc",
                             record_id="bhc-kwasakking",
-                            checked_at="2026-08-09",
+                            checked_at="2026-08-10",
                         ),
                         verification_status="reviewed",
                     )
@@ -435,6 +478,6 @@ def test_food_search_response_includes_curated_nutrition_metadata_and_preserves_
         "name": "BHC 공식 영양정보",
         "url": "https://example.test/bhc",
         "recordId": "bhc-kwasakking",
-        "checkedAt": "2026-08-09",
+        "checkedAt": "2026-08-10",
     }
     assert item["verificationStatus"] == "reviewed"
