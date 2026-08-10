@@ -47,6 +47,18 @@ class Settings(BaseSettings):
         default=4,
         validation_alias="FATSECRET_DETAIL_CONCURRENCY",
     )
+    kfood_api_key_encoded: str | None = Field(
+        default=None,
+        validation_alias="KFOOD_API_KEY_ENCODED",
+    )
+    kfood_base_url: str = Field(
+        default="https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02",
+        validation_alias="KFOOD_BASE_URL",
+    )
+    kfood_timeout_seconds: float = Field(
+        default=10.0,
+        validation_alias="KFOOD_TIMEOUT_SECONDS",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

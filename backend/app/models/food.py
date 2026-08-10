@@ -40,6 +40,7 @@ class FoodSearchRecord(BaseModel):
     source_food_name: str | None = None
     source_serving_id: str | None = None
     name: str
+    display_name: str | None = None
     brand_name: str | None
     category: str | None = None
     catalog_id: str | None = None
@@ -123,7 +124,9 @@ class FoodSearchItemDto(BaseModel):
         return cls(
             id=record.id,
             name=record.name,
-            displayName=display_name,
+            displayName=(
+                display_name if display_name is not None else record.display_name
+            ),
             brandName=record.brand_name,
             category=record.category,
             catalogId=record.catalog_id,

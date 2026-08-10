@@ -37,6 +37,27 @@ FatSecret variables:
 
 Basic mode calls the basic search/detail methods with `scope=basic` and returns `sourceRegion: "US"`. It does not pretend to provide localization. Korean query support in Basic is resolved in backend before FatSecret calls: `KoreanFoodCatalog` handles Korean food identity, brand aliases, curated official nutrition, external provider ids, and provider search mappings; `app/data/korean_food_aliases.json` remains a smaller generic query translation fallback for catalog misses. FatSecret nutrition payloads are not copied into the catalog. `curated_nutrition` is only for independently verified official/reviewed nutrition sources. Unknown Korean queries and catalog hits without verified nutrition/link return a normal empty result instead of sending arbitrary Korean text or unverified branded terms to FatSecret Basic. Basic search responses do not include enough serving detail for the current DTO, so the provider caps search results at `FATSECRET_BASIC_MAX_RESULTS` and resolves missing details through bounded concurrent `food.get.v2` calls. Premier mode calls `foods.search.v5` and `food.get.v5`, passes `region` and `language`, sends `format=json`, converts page `1` to FatSecret `page_number=0`, and caps page size at 50. Premier with `region=KR` and `language=ko` sends Korean queries as-is only when catalog/alias routing does not apply. Premier search items that already include sufficient serving data do not trigger `food.get.v5`; only insufficient items use the bounded fallback.
 
+## K-FIND Diagnostic
+
+K-FIND/MFDS food nutrition DB support is currently diagnostic-only. It is not included in `FOOD_PROVIDER`, `create_food_provider`, or `FoodSearchService` production routing.
+
+K-FIND variables:
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `KFOOD_API_KEY_ENCODED` | none | Public data portal Encoding key value. Use it as the `serviceKey` query value as-is; do not URL encode it again. Never expose it to frontend, docs, tests, or logs. |
+| `KFOOD_BASE_URL` | `https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02` | Base service URL. |
+| `KFOOD_TIMEOUT_SECONDS` | `10` | Async HTTP timeout for diagnostic requests. |
+
+The K-FIND provider maps official output fields from the data.go.kr reference document `출력메세지_식품영양성분DB정보.xlsx`: `AMT_NUM1` is energy kcal, `AMT_NUM3` is protein g, `AMT_NUM4` is fat g, and `AMT_NUM6` is carbohydrate g. The same document defines `Z10500` as food weight. `SERVING_SIZE` values such as `100g` are parsed into amount/unit without unit conversion; only records whose parsed unit is `g` are directly compatible with the current gram-input UX.
+
+Run the read-only diagnostics from the `backend` directory:
+
+```powershell
+python scripts/inspect_kfood_api.py --check-auth
+python scripts/inspect_kfood_api.py "된장찌개"
+```
+
 ## Run
 
 Use uvicorn directly; this project does not require the separate `fastapi` CLI.

@@ -100,3 +100,38 @@ class FatSecretInvalidResponseError(FoodProviderInvalidResponseError):
 class FatSecretUnavailableError(FoodProviderUnavailableError):
     error_code = "fatsecret_unavailable_error"
     public_message = "FatSecret API is temporarily unavailable."
+
+
+class KfindConfigurationError(FoodProviderConfigurationError):
+    error_code = "kfind_configuration_error"
+    public_message = "K-FIND provider is not configured correctly."
+
+
+class KfindAuthenticationError(FoodProviderAuthenticationError):
+    error_code = "kfind_authentication_error"
+    public_message = "K-FIND authentication failed."
+
+
+class KfindPermissionError(FoodProviderPermissionError):
+    error_code = "kfind_permission_error"
+    public_message = "K-FIND API permissions are insufficient for this request."
+
+
+class KfindRateLimitError(FoodProviderRateLimitError):
+    error_code = "kfind_rate_limit_error"
+    public_message = "K-FIND API rate limit was reached."
+
+
+class KfindTimeoutError(FoodProviderTimeoutError):
+    error_code = "kfind_timeout_error"
+    public_message = "K-FIND API request timed out."
+
+
+class KfindInvalidResponseError(FoodProviderInvalidResponseError):
+    error_code = "kfind_invalid_response_error"
+    public_message = "K-FIND API returned an invalid response."
+
+
+class KfindUnavailableError(FoodProviderUnavailableError):
+    error_code = "kfind_unavailable_error"
+    public_message = "K-FIND API is temporarily unavailable."
