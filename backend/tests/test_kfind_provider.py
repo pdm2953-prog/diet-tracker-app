@@ -1,4 +1,5 @@
 import asyncio
+import unicodedata
 from collections.abc import Awaitable, Callable
 
 import httpx
@@ -33,6 +34,7 @@ from app.providers.kfind import (
     mask_service_key,
     parse_serving_size,
 )
+from app.providers.kfind_ranking import normalize_kfind_comparison_text
 
 
 ENCODED_SERVICE_KEY = "encoded%2Bservice%2Fkey%3D"
@@ -105,6 +107,12 @@ def kfind_item(
     *,
     food_code: str = "D000001",
     food_name: str = "된장찌개_우렁",
+    db_group_name: str | None = "음식",
+    db_class_name: str | None = "품목대표",
+    food_origin_name: str | None = "외식",
+    food_category1_name: str | None = "음식",
+    food_reference_name: str | None = "된장찌개",
+    food_category2_name: str | None = "찌개 및 전골류",
     serving_size: str | None = "100g",
     calories: str | None = "46.00",
     water: str | None = "89.30",
@@ -113,26 +121,26 @@ def kfind_item(
     ash: str | None = "1.28",
     carbohydrate: str | None = "4.44",
     maker_name: str | None = "테스트업체",
+    import_manufacturer_name: str | None = "수입업체",
+    seller_manufacturer_name: str | None = "유통업체",
 ) -> dict[str, str]:
     item: dict[str, str] = {
         "FOOD_CD": food_code,
         "FOOD_NM_KR": food_name,
-        "DB_GRP_NM": "음식",
-        "DB_CLASS_NM": "품목대표",
-        "FOOD_OR_NM": "외식",
-        "FOOD_CAT1_NM": "음식",
-        "FOOD_REF_NM": "된장찌개",
-        "FOOD_CAT2_NM": "찌개 및 전골류",
         "SUB_REF_NAME": "식품의약품안전처",
         "DISH_ONE_SERVING": "1대접",
         "Z10500": "250g",
-        "IMP_MANUFAC_NM": "수입업체",
-        "SELLER_MANUFAC_NM": "유통업체",
         "CRT_MTH_NM": "분석",
         "RESEARCH_YMD": "20240102",
         "UPDATE_DATE": "20250203",
     }
     optional_fields = {
+        "DB_GRP_NM": db_group_name,
+        "DB_CLASS_NM": db_class_name,
+        "FOOD_OR_NM": food_origin_name,
+        "FOOD_CAT1_NM": food_category1_name,
+        "FOOD_REF_NM": food_reference_name,
+        "FOOD_CAT2_NM": food_category2_name,
         "SERVING_SIZE": serving_size,
         "AMT_NUM1": calories,
         "AMT_NUM2": water,
@@ -141,6 +149,8 @@ def kfind_item(
         "AMT_NUM5": ash,
         "AMT_NUM6": carbohydrate,
         "MAKER_NM": maker_name,
+        "IMP_MANUFAC_NM": import_manufacturer_name,
+        "SELLER_MANUFAC_NM": seller_manufacturer_name,
     }
 
     for key, value in optional_fields.items():
@@ -339,7 +349,179 @@ def test_multiple_korean_food_variants_preserve_source_name_and_only_normalize_d
     assert display_name_from_source_food_name("된장찌개_두부") == "된장찌개 - 두부"
 
 
+def generic_kfind_item(*, food_code: str, food_name: str) -> dict[str, str]:
+    return kfind_item(
+        food_code=food_code,
+        food_name=food_name,
+        maker_name=None,
+        import_manufacturer_name=None,
+        seller_manufacturer_name=None,
+    )
+
+
+def product_kfind_item(*, food_code: str, food_name: str) -> dict[str, str]:
+    return kfind_item(
+        food_code=food_code,
+        food_name=food_name,
+        db_group_name="가공식품",
+        db_class_name="제품",
+        food_origin_name="제조",
+        food_category1_name="가공식품",
+        food_reference_name=None,
+        food_category2_name="간편식",
+        maker_name="특정제조사",
+        import_manufacturer_name=None,
+        seller_manufacturer_name=None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("query", "variant_name"),
+    [
+        ("된장찌개", "된장찌개_두부"),
+        ("김치찌개", "김치찌개_참치"),
+        ("비빔밥", "비빔밥_돌솥"),
+        ("불고기", "불고기_버섯"),
+    ],
+)
+def test_kfind_ranking_prioritizes_exact_generic_variants_and_dedupes_food_code(
+    query: str,
+    variant_name: str,
+) -> None:
+    items = [
+        product_kfind_item(food_code="CONTAINS", food_name=f"간편조리세트 {query}"),
+        product_kfind_item(food_code="PRODUCT", food_name=query),
+        generic_kfind_item(food_code="VARIANT", food_name=variant_name),
+        generic_kfind_item(food_code="GENERIC", food_name=query),
+        generic_kfind_item(food_code="GENERIC", food_name=query),
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="5"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods(query, page=1, page_size=10))
+    candidates = response.candidates  # type: ignore[attr-defined]
+    source_ids = [candidate.record.source_food_id for candidate in candidates]
+
+    assert source_ids == ["GENERIC", "PRODUCT", "VARIANT", "CONTAINS"]
+    assert source_ids.count("GENERIC") == 1
+    assert candidates[0].record.source_food_name == query
+    assert candidates[0].record.name == query
+    assert candidates[0].metadata.raw_fields["FOOD_CD"] == "GENERIC"
+    assert candidates[0].metadata.food_weight == "250g"
+    assert candidates[0].record.nutrition_source is not None
+    assert candidates[0].record.nutrition_source.record_id == "GENERIC"
+
+
+def test_kfind_ranking_keeps_same_name_with_different_food_codes() -> None:
+    items = [
+        generic_kfind_item(food_code="A", food_name="된장찌개"),
+        generic_kfind_item(food_code="B", food_name="된장찌개"),
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="2"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("된장찌개", page=1, page_size=10))
+
+    assert [candidate.record.source_food_id for candidate in response.candidates] == ["A", "B"]  # type: ignore[attr-defined]
+
+
+def test_kfind_ranking_preserves_numeric_suffix_variant_without_deduping_by_name() -> None:
+    items = [
+        generic_kfind_item(food_code="A", food_name="된장찌개"),
+        generic_kfind_item(food_code="B", food_name="된장찌개_1"),
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="2"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("된장찌개", page=1, page_size=10))
+    records = [candidate.record for candidate in response.candidates]  # type: ignore[attr-defined]
+
+    assert [record.source_food_name for record in records] == ["된장찌개", "된장찌개_1"]
+    assert records[1].name == "된장찌개_1"
+    assert records[1].display_name == "된장찌개 - 1"
+
+
+def test_kfind_ranking_preserves_original_order_for_ties() -> None:
+    items = [
+        generic_kfind_item(food_code="B", food_name="김치찌개"),
+        generic_kfind_item(food_code="A", food_name="김치찌개"),
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="2"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("김치찌개", page=1, page_size=10))
+
+    assert [candidate.record.source_food_id for candidate in response.candidates] == ["B", "A"]  # type: ignore[attr-defined]
+
+
+def test_kfind_ranking_missing_optional_metadata_is_safe() -> None:
+    item = kfind_item(
+        food_code="MISSING",
+        food_name="비빔밥",
+        db_group_name=None,
+        db_class_name=None,
+        food_origin_name=None,
+        food_category1_name=None,
+        food_reference_name=None,
+        food_category2_name=None,
+        maker_name=None,
+        import_manufacturer_name=None,
+        seller_manufacturer_name=None,
+    )
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload([item], total_count="1"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("비빔밥", page=1, page_size=10))
+    candidate = response.candidates[0]  # type: ignore[attr-defined]
+
+    assert candidate.record.source_food_id == "MISSING"
+    assert candidate.metadata.db_group_name is None
+    assert candidate.metadata.db_class_name is None
+    assert candidate.metadata.display_maker_name is None
+
+
+def test_kfind_ranking_applies_top_n_after_dedup() -> None:
+    items = [
+        generic_kfind_item(food_code="GENERIC", food_name="불고기"),
+        generic_kfind_item(food_code="GENERIC", food_name="불고기"),
+        product_kfind_item(food_code="PRODUCT", food_name="불고기"),
+        generic_kfind_item(food_code="VARIANT", food_name="불고기_버섯"),
+        product_kfind_item(food_code="CONTAINS", food_name="즉석 불고기 덮밥"),
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="5"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("불고기", page=1, page_size=3))
+
+    assert [candidate.record.source_food_id for candidate in response.candidates] == [  # type: ignore[attr-defined]
+        "GENERIC",
+        "PRODUCT",
+        "VARIANT",
+    ]
+
+
+def test_kfind_comparison_normalization_is_conservative_and_display_normalization_is_separate() -> None:
+    decomposed_query = unicodedata.normalize("NFD", "된장찌개")
+
+    assert normalize_kfind_comparison_text("  된장찌개  ") == "된장찌개"
+    assert normalize_kfind_comparison_text(decomposed_query) == "된장찌개"
+    assert normalize_kfind_comparison_text("된장찌개_1") == "된장찌개_1"
+    assert display_name_from_source_food_name("된장찌개_1") == "된장찌개 - 1"
+
 def test_empty_result_is_safe() -> None:
+
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=normal_payload([], total_count="0"))
 

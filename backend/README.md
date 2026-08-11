@@ -51,6 +51,8 @@ K-FIND variables:
 
 The K-FIND provider maps official output fields from the data.go.kr reference document `출력메세지_식품영양성분DB정보.xlsx`: `AMT_NUM1` is energy kcal, `AMT_NUM3` is protein g, `AMT_NUM4` is fat g, and `AMT_NUM6` is carbohydrate g. The same document defines `Z10500` as food weight. `SERVING_SIZE` values such as `100g` are parsed into amount/unit without unit conversion; only records whose parsed unit is `g` are directly compatible with the current gram-input UX.
 
+K-FIND diagnostic search applies conservative backend ranking after upstream parsing. Exact normalized `FOOD_NM_KR` matches sort before prefix variants such as `된장찌개_두부`, and variants sort before weak contains matches. `DB_GRP_NM="음식"` and `DB_CLASS_NM="품목대표"` are ranking signals for generic food queries, not hard filters. Dedup is limited to exact duplicate `FOOD_CD` records; identical names with different `FOOD_CD` values are preserved, and suffixes such as `_1` are not interpreted or removed.
+
 Run the read-only diagnostics from the `backend` directory:
 
 ```powershell

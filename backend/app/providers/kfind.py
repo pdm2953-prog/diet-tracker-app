@@ -20,6 +20,7 @@ from app.providers.errors import (
     KfindUnavailableError,
 )
 from app.providers.interfaces import ProviderName
+from app.providers.kfind_ranking import rank_kfind_results
 
 
 KFIND_DEFAULT_BASE_URL = "https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02"
@@ -334,6 +335,7 @@ class KfindFoodProvider:
 
         return _search_response_from_payload(
             payload,
+            query=normalized_query,
             page=normalized_page,
             page_size=normalized_page_size,
         )
@@ -385,6 +387,7 @@ def display_name_from_source_food_name(source_food_name: str) -> str | None:
 def _search_response_from_payload(
     payload: JsonObject,
     *,
+    query: str,
     page: int,
     page_size: int,
 ) -> KfindFoodSearchResponse:
@@ -403,6 +406,7 @@ def _search_response_from_payload(
         for item_payload in item_payloads
         if (result := _search_result_from_item(item_payload)) is not None
     ]
+    ranked_candidates = rank_kfind_results(query, candidates, limit=page_size)
     total_count = _parse_non_negative_int(body.get("totalCount"))
     has_more = (
         page * page_size < total_count
@@ -411,7 +415,7 @@ def _search_response_from_payload(
     )
 
     return KfindFoodSearchResponse(
-        candidates=candidates,
+        candidates=ranked_candidates,
         page=page,
         page_size=page_size,
         total_count=total_count,
