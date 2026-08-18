@@ -27,6 +27,7 @@ from app.providers.kfind import (
     KFIND_CATEGORY_UNAVAILABLE,
     KFIND_DATA_SOURCE,
     KfindClient,
+    KfindFetchWindowPolicy,
     KfindFoodProvider,
     KfindProviderConfig,
     display_name_from_source_food_name,
@@ -66,12 +67,17 @@ def make_provider(
     handler: Callable[[httpx.Request], httpx.Response | Awaitable[httpx.Response]],
     *,
     config: KfindProviderConfig | None = None,
+    fetch_window_policy: KfindFetchWindowPolicy | None = None,
 ) -> KfindFoodProvider:
     resolved_config = config or make_config()
     http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     client = KfindClient(resolved_config, http_client=http_client)
 
-    return KfindFoodProvider(resolved_config, client)
+    return KfindFoodProvider(
+        resolved_config,
+        client,
+        fetch_window_policy=fetch_window_policy,
+    )
 
 
 def normal_payload(
@@ -212,7 +218,7 @@ def test_search_uses_food_name_param_and_does_not_double_encode_service_key() ->
     assert request.url.params["FOOD_NM_KR"] == "된장찌개"
     assert request.url.params["type"] == "json"
     assert request.url.params["pageNo"] == "1"
-    assert request.url.params["numOfRows"] == "10"
+    assert request.url.params["numOfRows"] == "20"
 
     candidate = response.candidates[0]  # type: ignore[attr-defined]
     record = candidate.record
@@ -509,6 +515,346 @@ def test_kfind_ranking_applies_top_n_after_dedup() -> None:
         "GENERIC",
         "PRODUCT",
         "VARIANT",
+    ]
+
+
+def test_kfind_fetch_window_overfetches_once_and_can_fill_page_after_food_code_dedup() -> None:
+    requests: list[httpx.Request] = []
+    items = [
+        generic_kfind_item(food_code="U01", food_name="된장찌개_01"),
+        generic_kfind_item(food_code="U01", food_name="된장찌개_01"),
+        *[
+            generic_kfind_item(food_code=f"U{index:02d}", food_name=f"된장찌개_{index:02d}")
+            for index in range(2, 11)
+        ],
+        generic_kfind_item(food_code="U10", food_name="된장찌개_10"),
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=normal_payload(items, total_count="12"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("된장찌개", page=1, page_size=10))
+
+    assert len(requests) == 1
+    assert requests[0].url.params["pageNo"] == "1"
+    assert requests[0].url.params["numOfRows"] == "20"
+    assert len(response.candidates) == 10  # type: ignore[attr-defined]
+    assert response.returned_count == 10  # type: ignore[attr-defined]
+    assert response.upstream_total_count == 12  # type: ignore[attr-defined]
+    assert response.total_count == 12  # type: ignore[attr-defined]
+    assert response.fetch_window is not None  # type: ignore[attr-defined]
+    assert response.fetch_window.raw_item_count == 12  # type: ignore[attr-defined]
+    assert response.fetch_window.ranked_candidate_count == 10  # type: ignore[attr-defined]
+    assert response.has_more is False  # type: ignore[attr-defined]
+
+
+def test_kfind_ranking_considers_exact_generic_candidate_inside_fetch_window() -> None:
+    query = "된장찌개"
+    items = [
+        product_kfind_item(food_code=f"PRODUCT{index:02d}", food_name=f"간편조리 {query} {index:02d}")
+        for index in range(1, 13)
+    ]
+    items.append(generic_kfind_item(food_code="GENERIC_EXACT", food_name=query))
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="13"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods(query, page=1, page_size=10))
+
+    assert response.candidates[0].record.source_food_id == "GENERIC_EXACT"  # type: ignore[attr-defined]
+
+
+def test_kfind_ranking_happens_before_page_slice_within_fetch_window() -> None:
+    items = [
+        product_kfind_item(food_code="CONTAINS1", food_name="즉석 불고기 덮밥"),
+        product_kfind_item(food_code="CONTAINS2", food_name="간편 불고기 전골"),
+        product_kfind_item(food_code="CONTAINS3", food_name="매운 불고기 소스"),
+        generic_kfind_item(food_code="EXACT", food_name="불고기"),
+        generic_kfind_item(food_code="VARIANT", food_name="불고기_버섯"),
+        product_kfind_item(food_code="CONTAINS4", food_name="도시락 불고기"),
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="6"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("불고기", page=1, page_size=3))
+
+    assert [candidate.record.source_food_id for candidate in response.candidates] == [  # type: ignore[attr-defined]
+        "EXACT",
+        "VARIANT",
+        "CONTAINS1",
+    ]
+
+
+def test_kfind_upstream_total_count_is_raw_not_deduplicated_result_count() -> None:
+    items = [
+        generic_kfind_item(food_code="A", food_name="김치찌개"),
+        generic_kfind_item(food_code="A", food_name="김치찌개"),
+        generic_kfind_item(food_code="B", food_name="김치찌개_참치"),
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="123"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("김치찌개", page=1, page_size=10))
+
+    assert len(response.candidates) == 2  # type: ignore[attr-defined]
+    assert response.upstream_total_count == 123  # type: ignore[attr-defined]
+    assert response.total_count == 123  # type: ignore[attr-defined]
+    assert response.fetch_window is not None  # type: ignore[attr-defined]
+    assert response.fetch_window.ranked_candidate_count == 2  # type: ignore[attr-defined]
+
+
+def test_kfind_duplicate_heavy_window_does_not_use_raw_total_for_has_more() -> None:
+    requests: list[httpx.Request] = []
+    items = [
+        generic_kfind_item(food_code=f"U{index:02d}", food_name=f"비빔밥_{index:02d}")
+        for index in range(8)
+    ] + [
+        generic_kfind_item(food_code=f"U{index % 8:02d}", food_name=f"비빔밥_{index % 8:02d}")
+        for index in range(12)
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=normal_payload(items, total_count="100"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("비빔밥", page=1, page_size=10))
+
+    assert requests[0].url.params["pageNo"] == "1"
+    assert requests[0].url.params["numOfRows"] == "20"
+    assert len(response.candidates) == 8  # type: ignore[attr-defined]
+    assert response.upstream_total_count == 100  # type: ignore[attr-defined]
+    assert response.fetch_window is not None  # type: ignore[attr-defined]
+    assert response.fetch_window.raw_item_count == 20  # type: ignore[attr-defined]
+    assert response.fetch_window.ranked_candidate_count == 8  # type: ignore[attr-defined]
+    assert response.has_more is False  # type: ignore[attr-defined]
+
+
+def test_kfind_has_more_is_false_when_window_is_exhausted_even_if_raw_total_is_larger() -> None:
+    items = [
+        generic_kfind_item(food_code=f"U{index:03d}", food_name=f"비빔밥_{index:03d}")
+        for index in range(50)
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["numOfRows"] == "100"
+        return httpx.Response(200, json=normal_payload(items, total_count="200"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("비빔밥", page=1, page_size=50))
+
+    assert len(response.candidates) == 50  # type: ignore[attr-defined]
+    assert response.has_more is False  # type: ignore[attr-defined]
+
+
+def test_kfind_empty_result_with_malformed_total_count_is_safe() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload([], total_count="not-a-number"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("없는음식", page=1, page_size=10))
+
+    assert response.candidates == []  # type: ignore[attr-defined]
+    assert response.upstream_total_count is None  # type: ignore[attr-defined]
+    assert response.total_count is None  # type: ignore[attr-defined]
+    assert response.has_more is False  # type: ignore[attr-defined]
+
+
+def test_kfind_missing_total_count_uses_bounded_window_fallback() -> None:
+    items = [
+        generic_kfind_item(food_code="A", food_name="김치찌개_돼지고기"),
+        generic_kfind_item(food_code="B", food_name="김치찌개"),
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        payload = normal_payload(items, total_count="2")
+        body = payload["body"]
+        assert isinstance(body, dict)
+        body.pop("totalCount")
+        return httpx.Response(200, json=payload)
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("김치찌개", page=1, page_size=1))
+
+    assert response.upstream_total_count is None  # type: ignore[attr-defined]
+    assert [candidate.record.source_food_id for candidate in response.candidates] == ["B"]  # type: ignore[attr-defined]
+    assert response.has_more is True  # type: ignore[attr-defined]
+
+
+def test_kfind_page_one_with_page_size_one_uses_bounded_window_and_returns_one_item() -> None:
+    requests: list[httpx.Request] = []
+    items = [
+        generic_kfind_item(food_code="VARIANT", food_name="김치찌개_참치"),
+        generic_kfind_item(food_code="EXACT", food_name="김치찌개"),
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=normal_payload(items, total_count="2"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("김치찌개", page=1, page_size=1))
+
+    assert requests[0].url.params["numOfRows"] == "2"
+    assert [candidate.record.source_food_id for candidate in response.candidates] == ["EXACT"]  # type: ignore[attr-defined]
+    assert response.has_more is True  # type: ignore[attr-defined]
+
+
+def test_kfind_page_greater_than_one_slices_bounded_ranked_window_not_upstream_page() -> None:
+    requests: list[httpx.Request] = []
+    all_items = [
+        generic_kfind_item(food_code=f"U{index:02d}", food_name=f"된장찌개_{index:02d}")
+        for index in range(25)
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        fetch_size = int(request.url.params["numOfRows"])
+        return httpx.Response(200, json=normal_payload(all_items[:fetch_size], total_count="25"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("된장찌개", page=2, page_size=10))
+
+    assert len(requests) == 1
+    assert requests[0].url.params["pageNo"] == "1"
+    assert requests[0].url.params["numOfRows"] == "20"
+    assert response.page == 2  # type: ignore[attr-defined]
+    assert response.page_size == 10  # type: ignore[attr-defined]
+    assert [candidate.record.source_food_id for candidate in response.candidates] == [  # type: ignore[attr-defined]
+        f"U{index:02d}" for index in range(10, 20)
+    ]
+    assert response.has_more is False  # type: ignore[attr-defined]
+
+
+def test_kfind_same_query_and_page_size_use_same_fetch_window_across_pages() -> None:
+    requests: list[httpx.Request] = []
+    items = [
+        generic_kfind_item(food_code=f"U{index:02d}", food_name=f"된장찌개_{index:02d}")
+        for index in range(20)
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=normal_payload(items, total_count="100"))
+
+    provider = make_provider(handler)
+    run(provider.search_foods("된장찌개", page=1, page_size=10))
+    run(provider.search_foods("된장찌개", page=2, page_size=10))
+
+    assert [request.url.params["pageNo"] for request in requests] == ["1", "1"]
+    assert [request.url.params["numOfRows"] for request in requests] == ["20", "20"]
+
+
+def test_kfind_bounded_window_excludes_high_ranking_candidate_after_fetch_size() -> None:
+    requests: list[httpx.Request] = []
+    query = "김치찌개"
+    all_items = [
+        product_kfind_item(food_code=f"CONTAINS{index:02d}", food_name=f"즉석 {query} {index:02d}")
+        for index in range(1, 21)
+    ] + [generic_kfind_item(food_code="EXACT_OUTSIDE", food_name=query)]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        fetch_size = int(request.url.params["numOfRows"])
+        return httpx.Response(200, json=normal_payload(all_items[:fetch_size], total_count="21"))
+
+    provider = make_provider(handler)
+    page_one = run(provider.search_foods(query, page=1, page_size=10))
+    page_two = run(provider.search_foods(query, page=2, page_size=10))
+
+    assert [request.url.params["numOfRows"] for request in requests] == ["20", "20"]
+    assert [candidate.record.source_food_id for candidate in page_one.candidates] == [  # type: ignore[attr-defined]
+        f"CONTAINS{index:02d}" for index in range(1, 11)
+    ]
+    assert [candidate.record.source_food_id for candidate in page_two.candidates] == [  # type: ignore[attr-defined]
+        f"CONTAINS{index:02d}" for index in range(11, 21)
+    ]
+    assert "EXACT_OUTSIDE" not in {
+        candidate.record.source_food_id
+        for candidate in [*page_one.candidates, *page_two.candidates]  # type: ignore[attr-defined]
+    }
+
+
+def test_kfind_bounded_second_page_has_more_only_inside_ranked_window() -> None:
+    items = [
+        generic_kfind_item(food_code=f"U{index:02d}", food_name=f"불고기_{index:02d}")
+        for index in range(20)
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="20"))
+
+    provider = make_provider(handler)
+    page_one = run(provider.search_foods("불고기", page=1, page_size=10))
+    page_two = run(provider.search_foods("불고기", page=2, page_size=10))
+
+    assert len(page_one.candidates) == 10  # type: ignore[attr-defined]
+    assert page_one.has_more is True  # type: ignore[attr-defined]
+    assert [candidate.record.source_food_id for candidate in page_two.candidates] == [  # type: ignore[attr-defined]
+        f"U{index:02d}" for index in range(10, 20)
+    ]
+    assert page_two.has_more is False  # type: ignore[attr-defined]
+
+
+def test_kfind_page_beyond_bounded_window_returns_empty_without_more() -> None:
+    items = [
+        generic_kfind_item(food_code=f"U{index:02d}", food_name=f"비빔밥_{index:02d}")
+        for index in range(20)
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="100"))
+
+    provider = make_provider(handler)
+    response = run(provider.search_foods("비빔밥", page=3, page_size=10))
+
+    assert response.candidates == []  # type: ignore[attr-defined]
+    assert response.has_more is False  # type: ignore[attr-defined]
+
+
+def test_kfind_fetch_window_policy_is_bounded_to_single_request() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=normal_payload([], total_count="100"))
+
+    provider = make_provider(
+        handler,
+        fetch_window_policy=KfindFetchWindowPolicy(fetch_multiplier=3, max_fetch_size=25),
+    )
+    response = run(provider.search_foods("비빔밥", page=1, page_size=10))
+
+    assert len(requests) == 1
+    assert requests[0].url.params["numOfRows"] == "25"
+    assert response.fetch_window is not None  # type: ignore[attr-defined]
+    assert response.fetch_window.fetch_multiplier == 3  # type: ignore[attr-defined]
+    assert response.fetch_window.max_fetch_size == 25  # type: ignore[attr-defined]
+
+
+def test_kfind_ordering_is_deterministic_for_same_window_response() -> None:
+    items = [
+        generic_kfind_item(food_code="B", food_name="김치찌개"),
+        generic_kfind_item(food_code="A", food_name="김치찌개"),
+        generic_kfind_item(food_code="C", food_name="김치찌개_참치"),
+    ]
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=normal_payload(items, total_count="3"))
+
+    provider = make_provider(handler)
+    first_response = run(provider.search_foods("김치찌개", page=1, page_size=10))
+    second_response = run(provider.search_foods("김치찌개", page=1, page_size=10))
+
+    assert [candidate.record.source_food_id for candidate in first_response.candidates] == [  # type: ignore[attr-defined]
+        candidate.record.source_food_id for candidate in second_response.candidates  # type: ignore[attr-defined]
     ]
 
 

@@ -53,6 +53,10 @@ The K-FIND provider maps official output fields from the data.go.kr reference do
 
 K-FIND diagnostic search applies conservative backend ranking after upstream parsing. Exact normalized `FOOD_NM_KR` matches sort before prefix variants such as `된장찌개_두부`, and variants sort before weak contains matches. `DB_GRP_NM="음식"` and `DB_CLASS_NM="품목대표"` are ranking signals for generic food queries, not hard filters. Dedup is limited to exact duplicate `FOOD_CD` records; identical names with different `FOOD_CD` values are preserved, and suffixes such as `_1` are not interpreted or removed.
 
+K-FIND `body.totalCount` is treated only as the raw upstream match count, not as the count of deduplicated or ranked results. Search uses one bounded upstream request from page 1 with a provider-neutral fetch window (`min(pageSize * fetch_multiplier, max_fetch_size)`, default multiplier `2`, capped by `max_fetch_size=100`) before normalize -> dedup identical `FOOD_CD` records -> rank -> page slice. The fetch window is independent of the requested provider-neutral page, so the same query and same `pageSize` rank the same bounded candidate window for page 1, page 2, and later pages.
+
+K-FIND pagination is stable only inside that bounded candidate window. The first production version prioritizes page 1 search quality and does not guarantee global ranked pagination across the full raw upstream result set. `hasMore` is conservative: it is true only when the current ranked/deduplicated candidate window contains an actual item after the requested page slice (`len(ranked_window) > page * pageSize`). Raw upstream `body.totalCount` remains metadata only and does not make `hasMore` true. If a requested page falls outside the bounded window, for example page 3 with `pageSize=10` and a 20-row fetch window, the provider returns `items: []` and `hasMore: false`; this is the current bounded K-FIND pagination limitation. Full stable pagination across all raw upstream matches should be implemented later with DB import, cache, or snapshot-backed search.
+
 Run the read-only diagnostics from the `backend` directory:
 
 ```powershell

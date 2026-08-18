@@ -31,6 +31,9 @@ KFIND_DEFAULT_SOURCE_NAME = "MFDS Food Nutrition DB"
 KFIND_AUTH_CHECK_QUERY = "된장찌개"
 MIN_PAGE_SIZE = 1
 MAX_PAGE_SIZE = 100
+KFIND_UPSTREAM_PAGE_FOR_RANKING = 1
+KFIND_FETCH_WINDOW_MULTIPLIER = 2
+KFIND_MAX_FETCH_SIZE = MAX_PAGE_SIZE
 
 # Official reference: data.go.kr 15127578, output message document
 # `출력메세지_식품영양성분DB정보.xlsx`.
@@ -126,6 +129,26 @@ class KfindProviderConfig:
 
 
 @dataclass(frozen=True)
+class KfindFetchWindowPolicy:
+    fetch_multiplier: int = KFIND_FETCH_WINDOW_MULTIPLIER
+    max_fetch_size: int = KFIND_MAX_FETCH_SIZE
+
+    def __post_init__(self) -> None:
+        if self.fetch_multiplier < 1:
+            raise ValueError("K-FIND fetch_multiplier must be 1 or greater.")
+
+        if self.max_fetch_size < MIN_PAGE_SIZE:
+            raise ValueError("K-FIND max_fetch_size must be 1 or greater.")
+
+    @property
+    def effective_max_fetch_size(self) -> int:
+        return min(self.max_fetch_size, MAX_PAGE_SIZE)
+
+    def fetch_size(self, *, page_size: int) -> int:
+        return min(page_size * self.fetch_multiplier, self.effective_max_fetch_size)
+
+
+@dataclass(frozen=True)
 class KfindProviderErrorMetadata:
     provider: str
     category: KfindErrorCategory
@@ -196,16 +219,35 @@ class KfindFoodSearchResult:
 
 
 @dataclass(frozen=True)
+class KfindFetchWindowMetadata:
+    upstream_page: int
+    upstream_page_size: int
+    fetch_multiplier: int
+    max_fetch_size: int
+    raw_item_count: int
+    ranked_candidate_count: int
+
+
+@dataclass(frozen=True)
 class KfindFoodSearchResponse:
     candidates: list[KfindFoodSearchResult]
     page: int
     page_size: int
-    total_count: int | None
+    upstream_total_count: int | None
     has_more: bool
+    fetch_window: KfindFetchWindowMetadata | None = None
 
     @property
     def items(self) -> list[FoodSearchRecord]:
         return [candidate.record for candidate in self.candidates]
+
+    @property
+    def returned_count(self) -> int:
+        return len(self.candidates)
+
+    @property
+    def total_count(self) -> int | None:
+        return self.upstream_total_count
 
 
 class KfindClient:
@@ -281,9 +323,16 @@ class KfindClient:
 
 
 class KfindFoodProvider:
-    def __init__(self, config: KfindProviderConfig, client: KfindClient | None = None) -> None:
+    def __init__(
+        self,
+        config: KfindProviderConfig,
+        client: KfindClient | None = None,
+        *,
+        fetch_window_policy: KfindFetchWindowPolicy | None = None,
+    ) -> None:
         self._config = config
         self._client = client or KfindClient(config)
+        self._fetch_window_policy = fetch_window_policy or KfindFetchWindowPolicy()
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -319,15 +368,18 @@ class KfindFoodProvider:
                 candidates=[],
                 page=normalized_page,
                 page_size=normalized_page_size,
-                total_count=0,
+                upstream_total_count=0,
                 has_more=False,
             )
 
+        fetch_size = self._fetch_window_policy.fetch_size(
+            page_size=normalized_page_size,
+        )
         payload = await self._client.get_json(
             {
                 "type": "json",
-                "pageNo": normalized_page,
-                "numOfRows": normalized_page_size,
+                "pageNo": KFIND_UPSTREAM_PAGE_FOR_RANKING,
+                "numOfRows": fetch_size,
                 "FOOD_NM_KR": normalized_query,
             },
             operation="search",
@@ -338,6 +390,8 @@ class KfindFoodProvider:
             query=normalized_query,
             page=normalized_page,
             page_size=normalized_page_size,
+            fetch_size=fetch_size,
+            fetch_window_policy=self._fetch_window_policy,
         )
 
 
@@ -390,6 +444,8 @@ def _search_response_from_payload(
     query: str,
     page: int,
     page_size: int,
+    fetch_size: int,
+    fetch_window_policy: KfindFetchWindowPolicy,
 ) -> KfindFoodSearchResponse:
     _validate_success_header(payload, operation="search")
     body = payload.get("body")
@@ -406,21 +462,43 @@ def _search_response_from_payload(
         for item_payload in item_payloads
         if (result := _search_result_from_item(item_payload)) is not None
     ]
-    ranked_candidates = rank_kfind_results(query, candidates, limit=page_size)
-    total_count = _parse_non_negative_int(body.get("totalCount"))
-    has_more = (
-        page * page_size < total_count
-        if total_count is not None
-        else len(item_payloads) == page_size
+    ranked_window_candidates = rank_kfind_results(query, candidates)
+    start_index = (page - 1) * page_size
+    end_index = start_index + page_size
+    page_candidates = ranked_window_candidates[start_index:end_index]
+    upstream_total_count = _parse_non_negative_int(body.get("totalCount"))
+    has_more = _has_more_kfind_results(
+        page=page,
+        page_size=page_size,
+        ranked_candidate_count=len(ranked_window_candidates),
     )
 
     return KfindFoodSearchResponse(
-        candidates=ranked_candidates,
+        candidates=page_candidates,
         page=page,
         page_size=page_size,
-        total_count=total_count,
+        upstream_total_count=upstream_total_count,
         has_more=has_more,
+        fetch_window=KfindFetchWindowMetadata(
+            upstream_page=KFIND_UPSTREAM_PAGE_FOR_RANKING,
+            upstream_page_size=fetch_size,
+            fetch_multiplier=fetch_window_policy.fetch_multiplier,
+            max_fetch_size=fetch_window_policy.effective_max_fetch_size,
+            raw_item_count=len(item_payloads),
+            ranked_candidate_count=len(ranked_window_candidates),
+        ),
     )
+
+
+def _has_more_kfind_results(
+    *,
+    page: int,
+    page_size: int,
+    ranked_candidate_count: int,
+) -> bool:
+    end_index = page * page_size
+
+    return end_index < ranked_candidate_count
 
 
 def _validate_success_header(payload: JsonObject, *, operation: str) -> None:
