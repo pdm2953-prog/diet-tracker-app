@@ -1,3 +1,4 @@
+import { fixedMealManagementLabel } from './constants';
 import type { DailySummary, MealSummary, NutritionField } from './models';
 import {
   nutritionLabels,
@@ -11,6 +12,11 @@ export const summaryMacroFields = [
   'carbohydrateG',
   'fatG',
 ] as const satisfies readonly PrimaryNutritionField[];
+
+export const mealSectionActionLabels = {
+  addFood: '음식 추가',
+  manageFixedMeals: fixedMealManagementLabel,
+} as const;
 
 export type CalorieHeroModel = {
   consumedLabel: string;
@@ -67,6 +73,9 @@ export function createMacroMetricModels(
     const value = summary.checkedNutritionTotal[field];
     const target = targets[field];
     const progressRatio = getProgressRatio(value, target);
+    const currentValueLabel = value === null
+      ? '—'
+      : formatCompactNutritionNumber(field, value);
 
     return {
       field,
@@ -74,7 +83,7 @@ export function createMacroMetricModels(
       label: nutritionLabels[field],
       progressRatio,
       progressWidth: toProgressWidth(progressRatio),
-      valueLabel: `${formatCompactNutritionNumber(field, value)} / ${formatCompactNutritionNumber(field, target)}${nutritionUnits[field]}`,
+      valueLabel: `${currentValueLabel} / ${formatCompactNutritionNumber(field, target)}${nutritionUnits[field]}`,
     };
   });
 }

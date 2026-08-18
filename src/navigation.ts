@@ -24,6 +24,10 @@ export function getGoalSetupScreenKey(): ScreenKey {
   return 'target';
 }
 
+export function getFixedMealManagementScreenKey(): ScreenKey {
+  return 'settings';
+}
+
 export function isBottomTabKey(screenKey: ScreenKey): screenKey is BottomTabKey {
   return screenKey !== 'target';
 }

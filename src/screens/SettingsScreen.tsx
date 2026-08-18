@@ -9,7 +9,7 @@ import {
   SectionHeader,
   StatusBadge,
 } from '../components/ui';
-import { mealLabels } from '../constants';
+import { fixedMealManagementLabel, mealLabels } from '../constants';
 import { mealTypes } from '../meals';
 import type { FixedMealTemplate, Food, MealType } from '../models';
 import type { DailyNutritionTargets } from '../nutrition';
@@ -100,7 +100,7 @@ export function SettingsScreen({
           <SectionHeader
             action={<StatusBadge label={`${fixedMealTemplates.length}개 등록`} tone="scheduled" />}
             subtitle="Today에서 고정으로 등록한 음식은 매일 예정 식단에 표시됩니다."
-            title="고정 식단 관리"
+            title={fixedMealManagementLabel}
           />
 
           {fixedMealTemplates.length > 0 ? (

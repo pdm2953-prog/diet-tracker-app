@@ -514,13 +514,13 @@ export const styles = StyleSheet.create({
   summaryKicker: {
     color: colors.textMuted,
     fontSize: fontSize.base,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: typography.lineHeight.base,
   },
   calorieHeroValue: {
     color: colors.text,
     fontSize: 56,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 0,
     lineHeight: 62,
   },
@@ -917,10 +917,10 @@ export const styles = StyleSheet.create({
   },
   mealTitle: {
     color: colors.text,
-    fontSize: fontSize.xl,
-    fontWeight: '900',
+    fontSize: 22,
+    fontWeight: '700',
     letterSpacing: 0,
-    lineHeight: typography.lineHeight.xl,
+    lineHeight: 28,
   },
   mealStatus: {
     color: colors.textMuted,
@@ -1026,9 +1026,9 @@ export const styles = StyleSheet.create({
   foodName: {
     color: colors.text,
     flexShrink: 1,
-    fontSize: fontSize.base,
-    fontWeight: '900',
-    lineHeight: typography.lineHeight.base,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    lineHeight: typography.lineHeight.lg,
   },
   foodSourceName: {
     color: colors.textSoft,
@@ -1963,10 +1963,10 @@ export const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   foodKcalText: {
-    color: colors.text,
+    color: colors.textMuted,
     flexShrink: 0,
     fontSize: fontSize.base,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: typography.lineHeight.base,
     textAlign: 'right',
   },
@@ -2405,7 +2405,7 @@ export const styles = StyleSheet.create({
   todayScreenTitle: {
     color: colors.text,
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 0,
     lineHeight: 34,
   },
@@ -2445,13 +2445,13 @@ export const styles = StyleSheet.create({
   dateNavButtonText: {
     color: colors.textMuted,
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: 24,
   },
   dateNavTodayButtonText: {
     color: colors.textMuted,
     fontSize: fontSize.sm,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: typography.lineHeight.sm,
   },
   dateNavTodayButtonTextActive: {
@@ -2465,7 +2465,7 @@ export const styles = StyleSheet.create({
   calorieHeroUnit: {
     color: colors.text,
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: 31,
   },
   calorieHeroMetaRow: {
@@ -2478,7 +2478,7 @@ export const styles = StyleSheet.create({
     color: colors.primary,
     flexShrink: 0,
     fontSize: fontSize.md,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: typography.lineHeight.md,
     textAlign: 'right',
   },
@@ -2490,14 +2490,14 @@ export const styles = StyleSheet.create({
   summaryMacroLabel: {
     color: colors.textMuted,
     fontSize: fontSize.sm,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: typography.lineHeight.sm,
   },
   summaryMacroValue: {
     color: colors.text,
-    fontSize: 17,
-    fontWeight: '900',
-    lineHeight: 22,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    lineHeight: typography.lineHeight.lg,
   },
   summaryMacroProgressTrack: {
     backgroundColor: colors.surfaceAlt,
@@ -2542,10 +2542,10 @@ export const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
   },
   mealKcalText: {
-    color: colors.text,
+    color: colors.textMuted,
     flexShrink: 0,
     fontSize: fontSize.base,
-    fontWeight: '900',
+    fontWeight: '700',
     lineHeight: typography.lineHeight.base,
     textAlign: 'right',
   },
@@ -2555,6 +2555,14 @@ export const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
     marginTop: spacing.sm,
   },
+  mealActionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+  },
   addFoodCompactButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
@@ -2562,7 +2570,6 @@ export const styles = StyleSheet.create({
     gap: spacing.xs,
     minHeight: 44,
     paddingRight: spacing.sm,
-    paddingTop: spacing.xs,
   },
   addFoodCompactButtonPressed: {
     opacity: 0.62,
@@ -2578,6 +2585,18 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '800',
     lineHeight: typography.lineHeight.md,
+  },
+  fixedMealManageButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.xs,
+  },
+  fixedMealManageButtonText: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    lineHeight: typography.lineHeight.sm,
   },
   settingsGoalSection: {
     gap: spacing.md,
@@ -2635,4 +2654,5 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.xl,
     fontWeight: '800',
     lineHeight: typography.lineHeight.xl,
-  },});
+  },
+});

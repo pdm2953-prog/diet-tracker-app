@@ -14,7 +14,7 @@ import {
 } from './src/fixedMeals';
 import { shouldPersistAppDataSnapshot, shouldRenderInteractiveApp } from './src/appHydration';
 import { getMealsForDate } from './src/meals';
-import { bottomTabs, getGoalSetupScreenKey } from './src/navigation';
+import { bottomTabs, getFixedMealManagementScreenKey, getGoalSetupScreenKey } from './src/navigation';
 import type { ScreenKey } from './src/navigation';
 import { createMockTodayData } from './src/mockTodayData';
 import type {
@@ -290,6 +290,7 @@ export default function App() {
             onCreateFixedMealTemplate={createFixedMealTemplate}
             onFoodsChange={setFoods}
             onHideFixedMealSourceKey={hideFixedMealForDate}
+            onOpenFixedMealManagement={() => setActiveTab(getFixedMealManagementScreenKey())}
             onSelectedDateChange={setSelectedDate}
             onUpdateSelectedDateMeals={updateSelectedDateMeals}
             selectedDate={selectedDate}

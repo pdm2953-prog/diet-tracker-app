@@ -52,6 +52,7 @@ type TodayScreenProps = {
   onCreateFixedMealTemplate: (mealType: MealType, mealFood: MealFood, food: Food) => void;
   onFoodsChange: Dispatch<SetStateAction<Food[]>>;
   onHideFixedMealSourceKey: (date: string, sourceKey: string) => void;
+  onOpenFixedMealManagement: (mealType: MealType) => void;
   onSelectedDateChange: (date: string) => void;
   onUpdateSelectedDateMeals: (
     updatedAt: string,
@@ -73,6 +74,7 @@ export function TodayScreen({
   onCreateFixedMealTemplate,
   onFoodsChange,
   onHideFixedMealSourceKey,
+  onOpenFixedMealManagement,
   onSelectedDateChange,
   onUpdateSelectedDateMeals,
   selectedDate,
@@ -170,6 +172,12 @@ export function TodayScreen({
     closeFoodSearch();
     closePortionModal();
     onSelectedDateChange(getLocalDateString());
+  };
+
+  const openFixedMealManagement = (mealType: MealType) => {
+    closeFoodSearch();
+    closePortionModal();
+    onOpenFixedMealManagement(mealType);
   };
 
   useEffect(() => {
@@ -439,6 +447,7 @@ export function TodayScreen({
               onCreateFixedMeal={createFixedMealFromMealFood}
               onDecreaseGrams={decreaseMealFoodGrams}
               onIncreaseGrams={increaseMealFoodGrams}
+              onOpenFixedMealManagement={openFixedMealManagement}
               onRemoveFood={removeMealFood}
               onOpenSearch={openFoodSearch}
               onToggle={toggleMealFood}

@@ -43,7 +43,7 @@ export function NutritionSummaryPanel({
         {macroMetrics.map((macro) => (
           <View key={macro.field} style={styles.summaryMacroItem}>
             <Text style={styles.summaryMacroLabel}>{macro.label}</Text>
-            <Text style={styles.summaryMacroValue}>{macro.valueLabel}</Text>
+            <Text numberOfLines={1} style={styles.summaryMacroValue}>{macro.valueLabel}</Text>
             <View style={styles.summaryMacroProgressTrack}>
               <View
                 style={[

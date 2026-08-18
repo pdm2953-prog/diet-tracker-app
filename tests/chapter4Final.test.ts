@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { fixedMealManagementLabel } from '../src/constants';
 import { createSettingsGoalEntryModel, isNutritionGoalType } from '../src/goalPresentation';
 import { buildDailySummary, dailyTargets } from '../src/nutrition';
 import { nutritionGoalLabels } from '../src/nutritionGoals';
-import { appScreenKeys, bottomTabs, getGoalSetupScreenKey } from '../src/navigation';
+import { appScreenKeys, bottomTabs, getFixedMealManagementScreenKey, getGoalSetupScreenKey } from '../src/navigation';
 import type { DailySummary, Food, Meal, MealFood, MealSummary, Nutrition } from '../src/models';
 import {
   calculateNutritionForConsumedGrams,
@@ -14,6 +15,7 @@ import {
   createMacroMetricModels,
   createMealSectionModel,
   formatCompactNutritionNumber,
+  mealSectionActionLabels,
 } from '../src/todayPresentation';
 
 const timestamp = '2026-08-18T00:00:00.000Z';
@@ -134,6 +136,50 @@ test('Chapter 4-D macro summary keeps existing protein, carbohydrate, and fat ca
     '42 / 65g',
   ]);
   assert.equal(macros.find((macro) => macro.field === 'fatG')?.isMissing, true);
+});
+
+test('Chapter 4 polish displays missing macro current value as a dash without changing unknown nutrition', () => {
+  const meal: Meal = {
+    id: 'meal-breakfast',
+    date: '2026-08-18',
+    type: 'breakfast',
+    foods: [makeMealFood(true, makeNutrition({
+      caloriesKcal: 180,
+      carbohydrateG: null,
+      fatG: 5,
+      proteinG: 12,
+    }))],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const summary = buildDailySummary('2026-08-18', [meal]);
+  const macros = createMacroMetricModels(summary, {
+    caloriesKcal: 2000,
+    carbohydrateG: 157.6,
+    fatG: 42,
+    proteinG: 126,
+  });
+  const carbohydrate = macros.find((macro) => macro.field === 'carbohydrateG');
+
+  assert.equal(summary.checkedNutritionTotal.carbohydrateG, null);
+  assert.equal(carbohydrate?.valueLabel, '— / 157.6g');
+  assert.equal(carbohydrate?.progressWidth, '0%');
+  assert.equal(carbohydrate?.isMissing, true);
+  assert.deepEqual(macros.map((macro) => macro.valueLabel), [
+    '12 / 126g',
+    '— / 157.6g',
+    '5 / 42g',
+  ]);
+  assert.equal(macros.every((macro) => !macro.valueLabel.includes('정보 없음')), true);
+  assert.equal(macros.every((macro) => !macro.valueLabel.includes('\n')), true);
+  assert.equal(macros.every((macro) => /^(?:—|[\d,.]+) \/ [\d,.]+g$/.test(macro.valueLabel)), true);
+});
+
+test('Chapter 4 polish exposes Today fixed meal management entry through existing Settings management path', () => {
+  assert.equal(mealSectionActionLabels.addFood, '음식 추가');
+  assert.equal(mealSectionActionLabels.manageFixedMeals, fixedMealManagementLabel);
+  assert.equal(getFixedMealManagementScreenKey(), 'settings');
+  assert.equal(bottomTabs.some((tab) => tab.key === getFixedMealManagementScreenKey()), true);
 });
 
 test('Chapter 4-D meal section model keeps meal calories, completion, and missing nutrition state', () => {

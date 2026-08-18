@@ -16,6 +16,7 @@ import { styles } from '../styles';
 import {
   createMealSectionModel,
   formatCompactNutritionWithUnit,
+  mealSectionActionLabels,
 } from '../todayPresentation';
 import { formatAmountLabel } from '../utils/format';
 import { getDevelopmentSourceFoodName, getFoodDisplayName } from '../utils/foodDisplay';
@@ -27,6 +28,7 @@ type MealSectionProps = {
   onCreateFixedMeal: (mealId: string, mealFoodId: string) => void;
   onDecreaseGrams: (mealId: string, mealFoodId: string) => void;
   onIncreaseGrams: (mealId: string, mealFoodId: string) => void;
+  onOpenFixedMealManagement: (mealType: MealType) => void;
   onOpenSearch: (mealType: MealType) => void;
   onRemoveFood: (mealId: string, mealFoodId: string) => void;
   onToggle: (mealId: string, mealFoodId: string) => void;
@@ -40,6 +42,7 @@ export function MealSection({
   onCreateFixedMeal,
   onDecreaseGrams,
   onIncreaseGrams,
+  onOpenFixedMealManagement,
   onOpenSearch,
   onRemoveFood,
   onToggle,
@@ -86,18 +89,31 @@ export function MealSection({
         )}
       </View>
 
-      <Pressable
-        accessibilityLabel={`${mealLabels[meal.type]} 음식 추가`}
-        accessibilityRole="button"
-        onPress={() => onOpenSearch(meal.type)}
-        style={({ pressed }) => [
-          styles.addFoodCompactButton,
-          pressed ? styles.addFoodCompactButtonPressed : null,
-        ]}
-      >
-        <Text style={styles.addFoodCompactIcon}>+</Text>
-        <Text style={styles.addFoodCompactText}>음식 추가</Text>
-      </Pressable>
+      <View style={styles.mealActionRow}>
+        <Pressable
+          accessibilityLabel={`${mealLabels[meal.type]} 음식 추가`}
+          accessibilityRole="button"
+          onPress={() => onOpenSearch(meal.type)}
+          style={({ pressed }) => [
+            styles.addFoodCompactButton,
+            pressed ? styles.addFoodCompactButtonPressed : null,
+          ]}
+        >
+          <Text style={styles.addFoodCompactIcon}>+</Text>
+          <Text style={styles.addFoodCompactText}>{mealSectionActionLabels.addFood}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel={`${mealLabels[meal.type]} 고정 식단 관리`}
+          accessibilityRole="button"
+          onPress={() => onOpenFixedMealManagement(meal.type)}
+          style={({ pressed }) => [
+            styles.fixedMealManageButton,
+            pressed ? styles.addFoodCompactButtonPressed : null,
+          ]}
+        >
+          <Text style={styles.fixedMealManageButtonText}>{mealSectionActionLabels.manageFixedMeals}</Text>
+        </Pressable>
+      </View>
 
       {searchPanel}
     </View>
