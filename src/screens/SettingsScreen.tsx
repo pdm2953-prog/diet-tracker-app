@@ -1,62 +1,27 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import {
-  Card,
-  EmptyState,
-  PrimaryButton,
-  SecondaryButton,
-  SectionHeader,
-  StatusBadge,
-} from '../components/ui';
-import { fixedMealManagementLabel, mealLabels } from '../constants';
-import { mealTypes } from '../meals';
-import type { FixedMealTemplate, Food, MealType } from '../models';
-import type { DailyNutritionTargets } from '../nutrition';
-import { formatNutritionValue } from '../nutrition';
+import { Card, SecondaryButton, SectionHeader } from '../components/ui';
 import { createSettingsGoalEntryModel } from '../goalPresentation';
+import type { DailyNutritionTargets } from '../nutrition';
 import type { NutritionGoalType } from '../nutritionGoals';
 import { styles } from '../styles';
-import { formatAmountLabel } from '../utils/format';
-import { getFoodDisplayName } from '../utils/foodDisplay';
 
 type SettingsScreenProps = {
-  fixedMealTemplates: FixedMealTemplate[];
-  foods: Food[];
   nutritionGoalType: NutritionGoalType;
   onOpenGoalSetup: () => void;
-  onRemoveFixedMealTemplate: (templateId: string) => void;
-  onToggleFixedMealTemplate: (templateId: string) => void;
   targets: DailyNutritionTargets;
 };
 
 export function SettingsScreen({
-  fixedMealTemplates,
-  foods,
   nutritionGoalType,
   onOpenGoalSetup,
-  onRemoveFixedMealTemplate,
-  onToggleFixedMealTemplate,
   targets,
 }: SettingsScreenProps) {
-  const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState<string | null>(null);
-  const foodsById = useMemo(
-    () => Object.fromEntries(foods.map((food) => [food.id, food])) as Record<string, Food>,
-    [foods],
-  );
-  const templatesByMealType = useMemo(
-    () => groupFixedMealTemplatesByMealType(fixedMealTemplates),
-    [fixedMealTemplates],
-  );
   const goalEntry = useMemo(
     () => createSettingsGoalEntryModel(targets, nutritionGoalType),
     [nutritionGoalType, targets],
   );
-
-  const confirmRemoveFixedMealTemplate = (templateId: string) => {
-    onRemoveFixedMealTemplate(templateId);
-    setPendingDeleteTemplateId(null);
-  };
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -95,38 +60,6 @@ export function SettingsScreen({
             </View>
           </Pressable>
         </View>
-
-        <Card style={styles.settingsSectionCard}>
-          <SectionHeader
-            action={<StatusBadge label={`${fixedMealTemplates.length}개 등록`} tone="scheduled" />}
-            subtitle="Today에서 고정으로 등록한 음식은 매일 예정 식단에 표시됩니다."
-            title={fixedMealManagementLabel}
-          />
-
-          {fixedMealTemplates.length > 0 ? (
-            <View style={styles.fixedMealTemplateList}>
-              {mealTypes.map((mealType) => (
-                <FixedMealSlotGroup
-                  foodsById={foodsById}
-                  key={mealType}
-                  mealType={mealType}
-                  onCancelDelete={() => setPendingDeleteTemplateId(null)}
-                  onConfirmDelete={confirmRemoveFixedMealTemplate}
-                  onRequestDelete={setPendingDeleteTemplateId}
-                  onToggleFixedMealTemplate={onToggleFixedMealTemplate}
-                  pendingDeleteTemplateId={pendingDeleteTemplateId}
-                  templates={templatesByMealType[mealType]}
-                />
-              ))}
-            </View>
-          ) : (
-            <EmptyState
-              icon="-"
-              message="Today 식단에서 직접 추가한 음식의 고정 버튼을 누르면 daily 고정 식단이 만들어집니다."
-              title="등록된 고정 식단 없음"
-            />
-          )}
-        </Card>
 
         <Card style={styles.settingsSectionCard}>
           <SectionHeader
@@ -185,7 +118,7 @@ export function SettingsScreen({
               value="참고용"
             />
             <SettingsInfoRow
-              description="이미 기록된 과거 식단은 고정 식단 템플릿을 수정하거나 삭제해도 그대로 유지됩니다."
+              description="고정 식단은 Today의 각 식사 섹션에서 요일별로 관리하며, 이미 기록된 과거 식단은 유지됩니다."
               label="고정 식단 정책"
               value="기록 보존"
             />
@@ -212,153 +145,4 @@ function SettingsInfoRow({ description, label, value }: SettingsInfoRowProps) {
       <Text style={styles.settingsRowValue}>{value}</Text>
     </View>
   );
-}
-
-type FixedMealSlotGroupProps = {
-  foodsById: Record<string, Food>;
-  mealType: MealType;
-  onCancelDelete: () => void;
-  onConfirmDelete: (templateId: string) => void;
-  onRequestDelete: (templateId: string) => void;
-  onToggleFixedMealTemplate: (templateId: string) => void;
-  pendingDeleteTemplateId: string | null;
-  templates: FixedMealTemplate[];
-};
-
-function FixedMealSlotGroup({
-  foodsById,
-  mealType,
-  onCancelDelete,
-  onConfirmDelete,
-  onRequestDelete,
-  onToggleFixedMealTemplate,
-  pendingDeleteTemplateId,
-  templates,
-}: FixedMealSlotGroupProps) {
-  return (
-    <View style={styles.fixedMealSlotGroup}>
-      <View style={styles.fixedMealSlotHeader}>
-        <Text style={styles.fixedMealSlotTitle}>{mealLabels[mealType]}</Text>
-        <Text style={styles.fixedMealSlotCount}>{templates.length}개</Text>
-      </View>
-
-      {templates.length > 0 ? (
-        templates.map((template) => (
-          <FixedMealTemplateRow
-            foodsById={foodsById}
-            key={template.id}
-            onCancelDelete={onCancelDelete}
-            onConfirmDelete={onConfirmDelete}
-            onRequestDelete={onRequestDelete}
-            onToggleFixedMealTemplate={onToggleFixedMealTemplate}
-            pendingDelete={pendingDeleteTemplateId === template.id}
-            template={template}
-          />
-        ))
-      ) : (
-        <Text style={styles.settingsMutedText}>{mealLabels[mealType]}에 등록된 고정 식단이 없습니다.</Text>
-      )}
-    </View>
-  );
-}
-
-type FixedMealTemplateRowProps = {
-  foodsById: Record<string, Food>;
-  onCancelDelete: () => void;
-  onConfirmDelete: (templateId: string) => void;
-  onRequestDelete: (templateId: string) => void;
-  onToggleFixedMealTemplate: (templateId: string) => void;
-  pendingDelete: boolean;
-  template: FixedMealTemplate;
-};
-
-function FixedMealTemplateRow({
-  foodsById,
-  onCancelDelete,
-  onConfirmDelete,
-  onRequestDelete,
-  onToggleFixedMealTemplate,
-  pendingDelete,
-  template,
-}: FixedMealTemplateRowProps) {
-  return (
-    <View style={[styles.fixedMealTemplateRow, !template.isActive ? styles.fixedMealTemplateRowInactive : null]}>
-      <View style={styles.fixedMealTemplateTitleRow}>
-        <View style={styles.fixedMealTemplateTitleBlock}>
-          <Text style={styles.fixedMealTemplateTitle}>{template.name}</Text>
-          <Text style={styles.fixedMealTemplateMeta}>
-            반복 daily · {template.items.length}개 음식 · {template.isActive ? '활성 상태' : '비활성 상태'}
-          </Text>
-        </View>
-        <StatusBadge
-          label={template.isActive ? '활성' : '비활성'}
-          tone={template.isActive ? 'success' : 'neutral'}
-        />
-      </View>
-
-      <View style={styles.fixedMealTemplateFoodList}>
-        {template.items.map((item) => {
-          const food = foodsById[item.foodId] ?? item.foodSnapshot;
-
-          return (
-            <View key={item.id} style={styles.fixedMealTemplateFoodRow}>
-              <Text style={styles.fixedMealTemplateFoodName}>{getFoodDisplayName(food)}</Text>
-              <Text style={styles.fixedMealTemplateFoodMeta}>
-                {formatAmountLabel(item.consumedGrams)}g · {formatNutritionValue('caloriesKcal', item.calculatedNutrition.caloriesKcal)}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-
-      <View style={styles.fixedMealTemplateActions}>
-        <SecondaryButton
-          accessibilityLabel={`${template.name} ${template.isActive ? '비활성화' : '활성화'}`}
-          label={template.isActive ? '비활성화' : '활성화'}
-          onPress={() => onToggleFixedMealTemplate(template.id)}
-          style={styles.fixedMealTemplateActionButton}
-        />
-        <SecondaryButton
-          accessibilityLabel={`${template.name} 삭제 확인 열기`}
-          label="삭제"
-          onPress={() => onRequestDelete(template.id)}
-          style={[styles.fixedMealTemplateActionButton, styles.fixedMealTemplateDeleteButton]}
-          textStyle={styles.fixedMealTemplateDeleteButtonText}
-        />
-      </View>
-
-      {pendingDelete ? (
-        <View style={styles.fixedMealTemplateConfirmBox}>
-          <Text style={styles.fixedMealTemplateConfirmText}>
-            이 고정 식단을 삭제하면 앞으로 예정 식단에 나타나지 않습니다. 이미 기록된 과거 식단은 변경되지 않습니다.
-          </Text>
-          <View style={styles.fixedMealTemplateConfirmActions}>
-            <SecondaryButton
-              accessibilityLabel={`${template.name} 삭제 취소`}
-              label="취소"
-              onPress={onCancelDelete}
-              style={styles.fixedMealTemplateActionButton}
-            />
-            <PrimaryButton
-              accessibilityLabel={`${template.name} 삭제 확인`}
-              label="삭제 확인"
-              onPress={() => onConfirmDelete(template.id)}
-              style={[styles.fixedMealTemplateActionButton, styles.fixedMealTemplateConfirmDeleteButton]}
-              textStyle={styles.fixedMealTemplateConfirmDeleteButtonText}
-            />
-          </View>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function groupFixedMealTemplatesByMealType(
-  templates: FixedMealTemplate[],
-): Record<MealType, FixedMealTemplate[]> {
-  return {
-    breakfast: templates.filter((template) => template.mealType === 'breakfast'),
-    lunch: templates.filter((template) => template.mealType === 'lunch'),
-    dinner: templates.filter((template) => template.mealType === 'dinner'),
-  };
 }

@@ -126,6 +126,7 @@ function makeFixedTemplate({
     name: '테스트 고정 식단',
     mealType,
     schedule: 'daily',
+    weekdays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
     isActive: true,
     items: [{
       id: itemId,

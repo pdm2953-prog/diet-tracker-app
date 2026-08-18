@@ -1,6 +1,7 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { allFixedMealWeekdays } from '../src/fixedMealRecurrence';
 import type { AppDataSnapshot } from '../src/storage';
 import {
   restoreAppDataSnapshot,
@@ -84,6 +85,7 @@ test('restoreAppDataSnapshot round-trips valid versioned local data', () => {
       name: 'storage template',
       mealType: 'breakfast',
       schedule: 'daily',
+      weekdays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
       isActive: true,
       items: [{
         id: 'item-storage',
@@ -347,4 +349,45 @@ test('restoreAppDataSnapshot safely falls back for invalid stored fields', () =>
   assert.deepEqual(restored.hiddenFixedMealSourceKeys, fallback.hiddenFixedMealSourceKeys);
   assert.deepEqual(restored.mealsByDate, fallback.mealsByDate);
   assert.deepEqual(restored.todayTargets, fallback.todayTargets);
+});
+
+
+test('restoreAppDataSnapshot hydrates legacy and invalid fixed meal weekdays as daily all week', () => {
+  const baseTemplate = {
+    id: 'legacy-template-storage',
+    name: 'legacy template',
+    mealType: 'breakfast',
+    schedule: 'daily',
+    isActive: true,
+    items: [{
+      id: 'legacy-item-storage',
+      foodId: food.id,
+      foodSnapshot: food,
+      consumedGrams: 100,
+      calculatedNutrition: makeNutrition({ caloriesKcal: 100, proteinG: 10 }),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const rawValue = JSON.stringify({
+    version: 1,
+    fixedMealTemplates: [
+      baseTemplate,
+      { ...baseTemplate, id: 'empty-weekdays-template', weekdays: [] },
+      { ...baseTemplate, id: 'partial-weekdays-template', weekdays: ['mon', 'bogus', 'wed'] },
+    ],
+    foods: [food],
+    hiddenFixedMealSourceKeys: {},
+    mealsByDate: {},
+    nutritionGoalType: 'maintain',
+    todayTargets: fallback.todayTargets,
+  });
+
+  const restored = restoreAppDataSnapshot(rawValue, fallback);
+
+  assert.deepEqual(restored.fixedMealTemplates[0]?.weekdays, allFixedMealWeekdays);
+  assert.deepEqual(restored.fixedMealTemplates[1]?.weekdays, allFixedMealWeekdays);
+  assert.deepEqual(restored.fixedMealTemplates[2]?.weekdays, ['mon', 'wed']);
 });

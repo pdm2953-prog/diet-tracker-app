@@ -1,12 +1,19 @@
 import type {
   FixedMealTemplate,
   FixedMealTemplateItem,
+  FixedMealWeekday,
   Food,
   HiddenFixedMealSourceKeysByDate,
   Meal,
   MealFood,
   MealType,
 } from './models';
+import {
+  allFixedMealWeekdays,
+  fixedMealTemplateAppliesOnDate,
+  normalizeFixedMealWeekdays,
+  toggleFixedMealWeekdaySelection,
+} from './fixedMealRecurrence';
 import { calculateNutritionForConsumedGrams } from './nutrition';
 import {
   createEmptyMealsForDate,
@@ -32,6 +39,7 @@ export type CreateFixedMealTemplateOptions = {
   templateId: string;
   templateItemId: string;
   timestamp: string;
+  weekdays?: readonly FixedMealWeekday[];
 };
 
 export type FixedMealSourceFields = {
@@ -90,14 +98,16 @@ export function createFixedMealSourceFields(
 export function createPromotedFixedMealTemplateIds(
   mealType: MealType,
   mealFood: MealFood,
+  weekdays: readonly FixedMealWeekday[] = allFixedMealWeekdays,
 ): { templateId: string; templateItemId: string } {
   const foodIdPart = createStableIdPart(mealFood.foodId);
+  const weekdaysPart = createStableIdPart(normalizeFixedMealWeekdays(weekdays).join('-'));
   const gramsPart = createStableIdPart(formatStableNumber(
     normalizeConsumedGrams(mealFood.consumedGrams),
   ));
 
   return {
-    templateId: `fixed-template-daily-${mealType}-${foodIdPart}-${gramsPart}`,
+    templateId: `fixed-template-daily-${mealType}-${foodIdPart}-${gramsPart}-${weekdaysPart}`,
     templateItemId: `item-${foodIdPart}-${gramsPart}`,
   };
 }
@@ -140,7 +150,7 @@ export function applyFixedMealTemplatesToMeals({
 
   const generatedFoodsByMealType = fixedMealTemplates.reduce<Record<MealType, MealFood[]>>(
     (foodsByMealType, template) => {
-      if (!template.isActive || template.schedule !== 'daily') {
+      if (!fixedMealTemplateAppliesOnDate(template, date)) {
         return foodsByMealType;
       }
 
@@ -217,6 +227,7 @@ export function createDailyFixedMealTemplateFromMealFood({
   templateId,
   templateItemId,
   timestamp,
+  weekdays = allFixedMealWeekdays,
 }: CreateFixedMealTemplateOptions): FixedMealTemplate | null {
   if (
     !hasValidGramServing(food)
@@ -245,6 +256,7 @@ export function createDailyFixedMealTemplateFromMealFood({
     name: `${getFoodDisplayName(food)} 고정 식단`,
     mealType,
     schedule: 'daily',
+    weekdays: normalizeFixedMealWeekdays(weekdays),
     isActive: true,
     items: [item],
     createdAt: timestamp,
@@ -260,6 +272,7 @@ export function promoteMealFoodToFixedMeal({
   templateId,
   templateItemId,
   timestamp,
+  weekdays = allFixedMealWeekdays,
 }: PromoteMealFoodToFixedMealOptions): PromoteMealFoodToFixedMealResult {
   if (isFixedMealFood(mealFood)) {
     return {
@@ -273,12 +286,20 @@ export function promoteMealFoodToFixedMeal({
     fixedMealTemplates,
     mealType,
     mealFood,
+    weekdays,
   );
 
   if (existingTemplateItem !== null) {
     return {
       createdTemplate: false,
-      fixedMealTemplates,
+      fixedMealTemplates: existingTemplateItem.template.isActive
+        ? fixedMealTemplates
+        : setFixedMealTemplateActive(
+            fixedMealTemplates,
+            existingTemplateItem.template.id,
+            true,
+            timestamp,
+          ),
       sourceFields: existingTemplateItem.sourceFields,
     };
   }
@@ -290,6 +311,7 @@ export function promoteMealFoodToFixedMeal({
     templateId,
     templateItemId,
     timestamp,
+    weekdays,
   });
 
   if (template === null) {
@@ -370,15 +392,21 @@ export function findEquivalentDailyFixedMealTemplateItem(
   fixedMealTemplates: FixedMealTemplate[],
   mealType: MealType,
   mealFood: MealFood,
+  weekdays: readonly FixedMealWeekday[] = allFixedMealWeekdays,
 ): FixedMealTemplateItemReference | null {
   const consumedGrams = normalizeConsumedGrams(mealFood.consumedGrams);
+  const normalizedWeekdays = normalizeFixedMealWeekdays(weekdays);
 
   if (consumedGrams <= 0) {
     return null;
   }
 
   for (const template of fixedMealTemplates) {
-    if (!template.isActive || template.schedule !== 'daily' || template.mealType !== mealType) {
+    if (
+      template.schedule !== 'daily'
+      || template.mealType !== mealType
+      || !areFixedMealWeekdaysEqual(template.weekdays, normalizedWeekdays)
+    ) {
       continue;
     }
 
@@ -403,14 +431,100 @@ export function hasEquivalentDailyFixedMealTemplate(
   fixedMealTemplates: FixedMealTemplate[],
   mealType: MealType,
   mealFood: MealFood,
+  weekdays: readonly FixedMealWeekday[] = allFixedMealWeekdays,
 ): boolean {
   return findEquivalentDailyFixedMealTemplateItem(
     fixedMealTemplates,
     mealType,
     mealFood,
+    weekdays,
   ) !== null;
 }
 
+export function setFixedMealTemplateActive(
+  fixedMealTemplates: FixedMealTemplate[],
+  templateId: string,
+  isActive: boolean,
+  updatedAt: string,
+): FixedMealTemplate[] {
+  return fixedMealTemplates.map((template) =>
+    template.id === templateId && template.isActive !== isActive
+      ? { ...template, isActive, updatedAt }
+      : template,
+  );
+}
+
+export function removeFixedMealTemplateById(
+  fixedMealTemplates: FixedMealTemplate[],
+  templateId: string,
+): FixedMealTemplate[] {
+  return fixedMealTemplates.filter((template) => template.id !== templateId);
+}
+
+export function setFixedMealTemplateWeekdays(
+  fixedMealTemplates: FixedMealTemplate[],
+  templateId: string,
+  weekdays: readonly FixedMealWeekday[],
+  updatedAt: string,
+): FixedMealTemplate[] {
+  if (weekdays.length === 0) {
+    return fixedMealTemplates;
+  }
+
+  const normalizedWeekdays = normalizeFixedMealWeekdays(weekdays);
+
+  return fixedMealTemplates.map((template) => {
+    if (template.id !== templateId) {
+      return template;
+    }
+
+    if (areFixedMealWeekdaysEqual(template.weekdays, normalizedWeekdays)) {
+      return template;
+    }
+
+    return {
+      ...template,
+      weekdays: normalizedWeekdays,
+      updatedAt,
+    };
+  });
+}
+
+export function toggleFixedMealTemplateWeekday(
+  fixedMealTemplates: FixedMealTemplate[],
+  templateId: string,
+  weekday: FixedMealWeekday,
+  updatedAt: string,
+): FixedMealTemplate[] {
+  return fixedMealTemplates.map((template) => {
+    if (template.id !== templateId) {
+      return template;
+    }
+
+    const nextWeekdays = toggleFixedMealWeekdaySelection(template.weekdays, weekday);
+
+    if (areFixedMealWeekdaysEqual(template.weekdays, nextWeekdays)) {
+      return template;
+    }
+
+    return {
+      ...template,
+      weekdays: nextWeekdays,
+      updatedAt,
+    };
+  });
+}
+
+function areFixedMealWeekdaysEqual(
+  firstWeekdays: readonly FixedMealWeekday[],
+  secondWeekdays: readonly FixedMealWeekday[],
+): boolean {
+  const firstNormalized = normalizeFixedMealWeekdays(firstWeekdays);
+  const secondNormalized = normalizeFixedMealWeekdays(secondWeekdays);
+
+  return firstNormalized.length === secondNormalized.length
+    && firstNormalized.every((weekday, index) => weekday === secondNormalized[index]);
+}
 export function getFixedMealTemplateFoodSnapshots(
   fixedMealTemplates: FixedMealTemplate[],
 ): Food[] {

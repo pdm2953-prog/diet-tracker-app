@@ -28,6 +28,7 @@ type FoodSearchPanelProps = {
   onQueryChange: (query: string) => void;
   onSelectFood: (food: FoodSearchResult) => void;
   query: string;
+  subtitle?: string;
   queryMetadata: FoodSearchQueryMetadata | null;
   results: FoodSearchResult[];
   searchError: string | null;
@@ -41,6 +42,7 @@ export function FoodSearchPanel({
   onQueryChange,
   onSelectFood,
   query,
+  subtitle = '검색 후 섭취 g수를 입력해 식단에 추가합니다.',
   queryMetadata,
   results,
   searchError,
@@ -75,7 +77,7 @@ export function FoodSearchPanel({
               <View style={styles.searchHeaderTextBlock}>
                 <Text style={styles.sectionEyebrow}>{mealLabels[mealType]}</Text>
                 <Text style={styles.sectionTitle}>음식 검색</Text>
-                <Text style={styles.sectionSubtitle}>검색 후 섭취 g수를 입력해 식단에 추가합니다.</Text>
+                <Text style={styles.sectionSubtitle}>{subtitle}</Text>
               </View>
               <SecondaryButton
                 accessibilityLabel="음식 검색 닫기"

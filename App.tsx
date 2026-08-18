@@ -11,14 +11,19 @@ import {
   promoteMealFoodInMeals,
   promoteMealFoodToFixedMeal,
   hideFixedMealSourceKeyForDate,
+  removeFixedMealTemplateById,
+  setFixedMealTemplateActive,
+  setFixedMealTemplateWeekdays,
+  toggleFixedMealTemplateWeekday,
 } from './src/fixedMeals';
 import { shouldPersistAppDataSnapshot, shouldRenderInteractiveApp } from './src/appHydration';
-import { getMealsForDate } from './src/meals';
-import { bottomTabs, getFixedMealManagementScreenKey, getGoalSetupScreenKey } from './src/navigation';
+import { getMealsForDate, hasValidGramServing, normalizeConsumedGrams } from './src/meals';
+import { bottomTabs, getGoalSetupScreenKey } from './src/navigation';
 import type { ScreenKey } from './src/navigation';
 import { createMockTodayData } from './src/mockTodayData';
 import type {
   FixedMealTemplate,
+  FixedMealWeekday,
   Food,
   HiddenFixedMealSourceKeysByDate,
   Meal,
@@ -26,6 +31,7 @@ import type {
   MealsByDate,
   MealType,
 } from './src/models';
+import { calculateNutritionForConsumedGrams } from './src/nutrition';
 import type { DailyNutritionTargets } from './src/nutrition';
 import type { NutritionGoalType } from './src/nutritionGoals';
 import { BottomTabItem } from './src/components/ui';
@@ -236,24 +242,91 @@ export default function App() {
     }));
   };
 
-  const toggleFixedMealTemplate = (templateId: string) => {
+  const createFixedMealTemplateFromFood = (
+    mealType: MealType,
+    food: Food,
+    consumedGrams: number,
+  ) => {
+    const normalizedConsumedGrams = normalizeConsumedGrams(consumedGrams);
+
+    if (!hasValidGramServing(food) || normalizedConsumedGrams <= 0) {
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const mealFood: MealFood = {
+      id: `fixed-template-source-${food.id}-${Date.now()}`,
+      foodId: food.id,
+      mealId: `fixed-template-${mealType}`,
+      consumedGrams: normalizedConsumedGrams,
+      checked: false,
+      calculatedNutrition: calculateNutritionForConsumedGrams(
+        food.nutritionPerServing,
+        normalizedConsumedGrams,
+        food.servingSize,
+      ),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const { templateId, templateItemId } = createPromotedFixedMealTemplateIds(
+      mealType,
+      mealFood,
+    );
+
+    setFoods((currentFoods) =>
+      currentFoods.some((currentFood) => currentFood.id === food.id)
+        ? currentFoods
+        : [...currentFoods, food],
+    );
+
+    setFixedMealTemplates((currentTemplates) =>
+      promoteMealFoodToFixedMeal({
+        fixedMealTemplates: currentTemplates,
+        food,
+        mealFood,
+        mealType,
+        templateId,
+        templateItemId,
+        timestamp,
+      }).fixedMealTemplates,
+    );
+  };
+
+  const setFixedMealTemplateActiveState = (templateId: string, isActive: boolean) => {
     const updatedAt = new Date().toISOString();
 
     setFixedMealTemplates((currentTemplates) =>
-      currentTemplates.map((template) =>
-        template.id === templateId
-          ? { ...template, isActive: !template.isActive, updatedAt }
-          : template,
-      ),
+      setFixedMealTemplateActive(currentTemplates, templateId, isActive, updatedAt),
+    );
+  };
+
+  const setFixedMealTemplateWeekdaysState = (
+    templateId: string,
+    weekdays: readonly FixedMealWeekday[],
+  ) => {
+    const updatedAt = new Date().toISOString();
+
+    setFixedMealTemplates((currentTemplates) =>
+      setFixedMealTemplateWeekdays(currentTemplates, templateId, weekdays, updatedAt),
+    );
+  };
+
+  const toggleFixedMealTemplateWeekdayState = (
+    templateId: string,
+    weekday: FixedMealWeekday,
+  ) => {
+    const updatedAt = new Date().toISOString();
+
+    setFixedMealTemplates((currentTemplates) =>
+      toggleFixedMealTemplateWeekday(currentTemplates, templateId, weekday, updatedAt),
     );
   };
 
   const removeFixedMealTemplate = (templateId: string) => {
     setFixedMealTemplates((currentTemplates) =>
-      currentTemplates.filter((template) => template.id !== templateId),
+      removeFixedMealTemplateById(currentTemplates, templateId),
     );
   };
-
   const hideFixedMealForDate = (date: string, sourceKey: string) => {
     setHiddenFixedMealSourceKeys((currentSourceKeys) =>
       hideFixedMealSourceKeyForDate(currentSourceKeys, date, sourceKey),
@@ -287,10 +360,15 @@ export default function App() {
         <View style={[screenPaneStyle, activeTab !== 'today' ? hiddenScreenPaneStyle : null]}>
           <TodayScreen
             foods={visibleFoods}
+            fixedMealTemplates={fixedMealTemplates}
             onCreateFixedMealTemplate={createFixedMealTemplate}
+            onCreateFixedMealTemplateFromFood={createFixedMealTemplateFromFood}
             onFoodsChange={setFoods}
             onHideFixedMealSourceKey={hideFixedMealForDate}
-            onOpenFixedMealManagement={() => setActiveTab(getFixedMealManagementScreenKey())}
+            onRemoveFixedMealTemplate={removeFixedMealTemplate}
+            onSetFixedMealTemplateActive={setFixedMealTemplateActiveState}
+            onSetFixedMealTemplateWeekdays={setFixedMealTemplateWeekdaysState}
+            onToggleFixedMealTemplateWeekday={toggleFixedMealTemplateWeekdayState}
             onSelectedDateChange={setSelectedDate}
             onUpdateSelectedDateMeals={updateSelectedDateMeals}
             selectedDate={selectedDate}
@@ -320,14 +398,9 @@ export default function App() {
         </View>
         <View style={[screenPaneStyle, activeTab !== 'settings' ? hiddenScreenPaneStyle : null]}>
           <SettingsScreen
-            fixedMealTemplates={fixedMealTemplates}
-            foods={visibleFoods}
             nutritionGoalType={nutritionGoalType}
             onOpenGoalSetup={() => setActiveTab(getGoalSetupScreenKey())}
             targets={todayTargets}
-
-            onRemoveFixedMealTemplate={removeFixedMealTemplate}
-            onToggleFixedMealTemplate={toggleFixedMealTemplate}
           />
         </View>
       </View>

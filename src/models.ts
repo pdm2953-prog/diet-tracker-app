@@ -1,4 +1,4 @@
-﻿export type MealType = 'breakfast' | 'lunch' | 'dinner';
+export type MealType = 'breakfast' | 'lunch' | 'dinner';
 
 export type KnownFoodDataSource = 'mock' | 'fatsecret';
 export type FoodDataSource = KnownFoodDataSource | (string & Record<never, never>);
@@ -95,6 +95,7 @@ export type Meal = {
 export type MealsByDate = Record<string, Meal[]>;
 
 export type FixedMealSchedule = 'daily';
+export type FixedMealWeekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
 export type FixedMealTemplateItem = {
   id: string;
@@ -111,6 +112,7 @@ export type FixedMealTemplate = {
   name: string;
   mealType: MealType;
   schedule: FixedMealSchedule;
+  weekdays: FixedMealWeekday[];
   isActive: boolean;
   items: FixedMealTemplateItem[];
   createdAt: string;

@@ -4,12 +4,22 @@ import { test } from 'node:test';
 import {
   applyFixedMealTemplatesToMeals,
   createPromotedFixedMealTemplateIds,
+  removeFixedMealTemplateById,
+  setFixedMealTemplateActive,
+  setFixedMealTemplateWeekdays,
+  toggleFixedMealTemplateWeekday,
   promoteMealFoodInMeals,
   promoteMealFoodToFixedMeal,
 } from '../src/fixedMeals';
+import {
+  allFixedMealWeekdays,
+  fixedMealWeekdayPresets,
+  getFixedMealWeekdayForDate,
+} from '../src/fixedMealRecurrence';
 import { createEmptyMealsForDate } from '../src/meals';
 import type {
   FixedMealTemplate,
+  FixedMealWeekday,
   Food,
   Meal,
   MealFood,
@@ -97,13 +107,15 @@ function promoteDirectMealFood({
   food,
   mealFood,
   mealType = 'breakfast',
+  weekdays = allFixedMealWeekdays,
 }: {
   fixedMealTemplates?: FixedMealTemplate[];
   food: Food;
   mealFood: MealFood;
   mealType?: MealType;
+  weekdays?: readonly FixedMealWeekday[];
 }) {
-  const ids = createPromotedFixedMealTemplateIds(mealType, mealFood);
+  const ids = createPromotedFixedMealTemplateIds(mealType, mealFood, weekdays);
 
   return promoteMealFoodToFixedMeal({
     fixedMealTemplates,
@@ -113,6 +125,7 @@ function promoteDirectMealFood({
     templateId: ids.templateId,
     templateItemId: ids.templateItemId,
     timestamp,
+    weekdays,
   });
 }
 
@@ -236,4 +249,146 @@ test('promoting to an existing active template reuses it and removes the generat
   assert.equal(promotedFoods.length, 1);
   assert.equal(promotedFoods[0].id, secondMealFood.id);
   assert.equal(promotedFoods[0].sourceKey, firstPromotion.sourceFields!.sourceKey);
+});
+test('promoted fixed meal templates default to every weekday and encode non-daily weekday identity', () => {
+  const food = makeFood();
+  const mealFood = makeMealFood({ food });
+  const defaultPromotion = promoteDirectMealFood({ food, mealFood });
+  const weekdayIds = createPromotedFixedMealTemplateIds('breakfast', mealFood, ['mon', 'wed']);
+  const dailyIds = createPromotedFixedMealTemplateIds('breakfast', mealFood);
+
+  assert.deepEqual(defaultPromotion.fixedMealTemplates[0].weekdays, allFixedMealWeekdays);
+  assert.equal(weekdayIds.templateId === dailyIds.templateId, false);
+});
+
+test('fixed meal recurrence applies only on selected local weekdays', () => {
+  const tomato = makeFood('food-tomato');
+  const banana = makeFood('food-banana-weekday');
+  const tomatoPromotion = promoteDirectMealFood({
+    food: tomato,
+    mealFood: makeMealFood({ food: tomato, id: 'tomato-direct' }),
+    weekdays: ['mon', 'wed'],
+  });
+  const bananaPromotion = promoteDirectMealFood({
+    fixedMealTemplates: tomatoPromotion.fixedMealTemplates,
+    food: banana,
+    mealFood: makeMealFood({ food: banana, id: 'banana-direct' }),
+    weekdays: ['tue', 'thu'],
+  });
+  const templates = bananaPromotion.fixedMealTemplates;
+  const foodIdsForDate = (date: string) => applyFixedMealTemplatesToMeals({
+    date,
+    fixedMealTemplates: templates,
+    hiddenSourceKeys: [],
+    meals: createEmptyMealsForDate(date, timestamp),
+    timestamp,
+  }).flatMap((meal) => meal.foods.map((mealFood) => mealFood.foodId));
+
+  assert.deepEqual(foodIdsForDate('2026-08-17'), ['food-tomato']);
+  assert.deepEqual(foodIdsForDate('2026-08-18'), ['food-banana-weekday']);
+  assert.deepEqual(foodIdsForDate('2026-08-19'), ['food-tomato']);
+  assert.deepEqual(foodIdsForDate('2026-08-20'), ['food-banana-weekday']);
+  assert.deepEqual(foodIdsForDate('2026-08-21'), []);
+});
+
+test('fixed meal weekday presets cover weekdays, weekends, and Sunday to Monday local date boundary', () => {
+  assert.equal(getFixedMealWeekdayForDate('2026-08-16'), 'sun');
+  assert.equal(getFixedMealWeekdayForDate('2026-08-17'), 'mon');
+  assert.deepEqual(fixedMealWeekdayPresets.find((preset) => preset.key === 'weekday')?.weekdays, [
+    'mon',
+    'tue',
+    'wed',
+    'thu',
+    'fri',
+  ]);
+  assert.deepEqual(fixedMealWeekdayPresets.find((preset) => preset.key === 'weekend')?.weekdays, ['sat', 'sun']);
+});
+
+test('inactive fixed meal schedules do not project into meals and delete removes the template', () => {
+  const food = makeFood();
+  const promotion = promoteDirectMealFood({ food, mealFood: makeMealFood({ food }) });
+  const inactiveTemplates = setFixedMealTemplateActive(
+    promotion.fixedMealTemplates,
+    promotion.fixedMealTemplates[0].id,
+    false,
+    '2026-07-23T01:00:00.000Z',
+  );
+  const projectedMeals = applyFixedMealTemplatesToMeals({
+    date: nextDate,
+    fixedMealTemplates: inactiveTemplates,
+    hiddenSourceKeys: [],
+    meals: createEmptyMealsForDate(nextDate, timestamp),
+    timestamp,
+  });
+
+  assert.equal(inactiveTemplates[0].isActive, false);
+  assert.equal(projectedMeals.flatMap((meal) => meal.foods).length, 0);
+  assert.deepEqual(removeFixedMealTemplateById(inactiveTemplates, inactiveTemplates[0].id), []);
+});
+
+test('weekday editing persists at least one selected day and repeated reconciliation stays deduped', () => {
+  const food = makeFood();
+  const promotion = promoteDirectMealFood({ food, mealFood: makeMealFood({ food }) });
+  const templateId = promotion.fixedMealTemplates[0].id;
+  const saturdayOnlyTemplates = setFixedMealTemplateWeekdays(
+    promotion.fixedMealTemplates,
+    templateId,
+    ['sat'],
+    '2026-07-23T01:00:00.000Z',
+  );
+  const unchangedTemplates = setFixedMealTemplateWeekdays(
+    saturdayOnlyTemplates,
+    templateId,
+    [],
+    '2026-07-23T02:00:00.000Z',
+  );
+  const stillSaturdayTemplates = toggleFixedMealTemplateWeekday(
+    unchangedTemplates,
+    templateId,
+    'sat',
+    '2026-07-23T03:00:00.000Z',
+  );
+  const firstProjection = applyFixedMealTemplatesToMeals({
+    date: '2026-08-22',
+    fixedMealTemplates: stillSaturdayTemplates,
+    hiddenSourceKeys: [],
+    meals: createEmptyMealsForDate('2026-08-22', timestamp),
+    timestamp,
+  });
+  const secondProjection = applyFixedMealTemplatesToMeals({
+    date: '2026-08-22',
+    fixedMealTemplates: stillSaturdayTemplates,
+    hiddenSourceKeys: [],
+    meals: firstProjection,
+    timestamp,
+  });
+
+  assert.deepEqual(saturdayOnlyTemplates[0].weekdays, ['sat']);
+  assert.equal(unchangedTemplates, saturdayOnlyTemplates);
+  assert.deepEqual(stillSaturdayTemplates[0].weekdays, ['sat']);
+  assert.equal(firstProjection.flatMap((meal) => meal.foods).length, 1);
+  assert.equal(secondProjection.flatMap((meal) => meal.foods).length, 1);
+});
+
+
+
+test('promoting an inactive equivalent fixed meal reactivates it instead of duplicating template ids', () => {
+  const food = makeFood();
+  const mealFood = makeMealFood({ food });
+  const promotion = promoteDirectMealFood({ food, mealFood });
+  const inactiveTemplates = setFixedMealTemplateActive(
+    promotion.fixedMealTemplates,
+    promotion.fixedMealTemplates[0].id,
+    false,
+    '2026-07-23T01:00:00.000Z',
+  );
+  const reactivatedPromotion = promoteDirectMealFood({
+    fixedMealTemplates: inactiveTemplates,
+    food,
+    mealFood,
+  });
+
+  assert.equal(reactivatedPromotion.fixedMealTemplates.length, 1);
+  assert.equal(reactivatedPromotion.fixedMealTemplates[0].id, promotion.fixedMealTemplates[0].id);
+  assert.equal(reactivatedPromotion.fixedMealTemplates[0].isActive, true);
 });

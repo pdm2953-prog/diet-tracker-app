@@ -21,19 +21,27 @@ export type FoodPortionModalState = {
 };
 
 type FoodPortionModalProps = {
+  confirmAccessibilityLabel?: string;
+  confirmLabel?: string;
   gramsInput: string;
   onChangeGramsInput: (value: string) => void;
   onClose: () => void;
   onConfirm: () => void;
   state: FoodPortionModalState | null;
+  helpText?: string;
+  title?: string;
 };
 
 export function FoodPortionModal({
+  confirmAccessibilityLabel = '식단에 추가',
+  confirmLabel = '식단에 추가',
   gramsInput,
   onChangeGramsInput,
   onClose,
   onConfirm,
   state,
+  helpText = '입력한 g수 기준으로 식단 영양성분이 계산됩니다.',
+  title = '섭취량 입력',
 }: FoodPortionModalProps) {
   if (state === null) {
     return null;
@@ -76,7 +84,7 @@ export function FoodPortionModal({
           style={styles.modalScrim}
         />
         <View
-          accessibilityLabel={`${foodDisplayName} 섭취량 입력 대화상자`}
+          accessibilityLabel={`${foodDisplayName} ${title} 대화상자`}
           role="dialog"
           accessibilityViewIsModal
           aria-modal={true}
@@ -85,7 +93,7 @@ export function FoodPortionModal({
         >
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.portionHeader}>
-              <Text style={styles.portionModalTitle}>섭취량 입력</Text>
+              <Text style={styles.portionModalTitle}>{title}</Text>
               <Text style={styles.portionFoodName}>{foodDisplayName}</Text>
               {sourceFoodName !== null ? (
                 <Text style={styles.portionSourceFoodName}>{sourceFoodName}</Text>
@@ -111,7 +119,7 @@ export function FoodPortionModal({
                 />
                 <Text style={styles.portionUnitText}>g</Text>
               </View>
-              <Text style={styles.portionInputHelp}>입력한 g수 기준으로 식단 영양성분이 계산됩니다.</Text>
+              <Text style={styles.portionInputHelp}>{helpText}</Text>
             </View>
 
             {previewNutrition !== null ? (
@@ -146,9 +154,9 @@ export function FoodPortionModal({
                 textStyle={styles.portionCancelButtonText}
               />
               <PrimaryButton
-                accessibilityLabel="식단에 추가"
+                accessibilityLabel={confirmAccessibilityLabel}
                 disabled={!canConfirm}
-                label="식단에 추가"
+                label={confirmLabel}
                 onPress={onConfirm}
                 style={styles.portionConfirmButton}
                 textStyle={styles.portionConfirmButtonText}

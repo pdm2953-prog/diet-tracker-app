@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   FixedMealTemplate,
   Food,
   HiddenFixedMealSourceKeysByDate,
@@ -7,6 +7,7 @@
   MealsByDate,
   Nutrition,
 } from './models';
+import { normalizeFixedMealWeekdays } from './fixedMealRecurrence';
 import { DEFAULT_NUTRITION_GOAL_TYPE, isNutritionGoalType } from './goalPresentation';
 import { mealTypes } from './meals';
 import { dailyTargets } from './nutrition';
@@ -291,6 +292,7 @@ function parseFixedMealTemplate(value: unknown): FixedMealTemplate | null {
     name: value.name,
     mealType: value.mealType,
     schedule: 'daily',
+    weekdays: normalizeFixedMealWeekdays(value.weekdays),
     isActive: value.isActive,
     items: parsedItems as FixedMealTemplate['items'],
     createdAt: value.createdAt,

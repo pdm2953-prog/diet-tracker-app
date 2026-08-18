@@ -5,7 +5,7 @@ import { fixedMealManagementLabel } from '../src/constants';
 import { createSettingsGoalEntryModel, isNutritionGoalType } from '../src/goalPresentation';
 import { buildDailySummary, dailyTargets } from '../src/nutrition';
 import { nutritionGoalLabels } from '../src/nutritionGoals';
-import { appScreenKeys, bottomTabs, getFixedMealManagementScreenKey, getGoalSetupScreenKey } from '../src/navigation';
+import { appScreenKeys, bottomTabs, getGoalSetupScreenKey } from '../src/navigation';
 import type { DailySummary, Food, Meal, MealFood, MealSummary, Nutrition } from '../src/models';
 import {
   calculateNutritionForConsumedGrams,
@@ -175,11 +175,11 @@ test('Chapter 4 polish displays missing macro current value as a dash without ch
   assert.equal(macros.every((macro) => /^(?:—|[\d,.]+) \/ [\d,.]+g$/.test(macro.valueLabel)), true);
 });
 
-test('Chapter 4 polish exposes Today fixed meal management entry through existing Settings management path', () => {
+test('Chapter 5-A keeps Today fixed meal management as a meal-section action without making Settings its route', () => {
   assert.equal(mealSectionActionLabels.addFood, '음식 추가');
   assert.equal(mealSectionActionLabels.manageFixedMeals, fixedMealManagementLabel);
-  assert.equal(getFixedMealManagementScreenKey(), 'settings');
-  assert.equal(bottomTabs.some((tab) => tab.key === getFixedMealManagementScreenKey()), true);
+  assert.equal(bottomTabs.some((tab) => tab.key === 'settings'), true);
+  assert.equal(appScreenKeys.includes('target'), true);
 });
 
 test('Chapter 4-D meal section model keeps meal calories, completion, and missing nutrition state', () => {
