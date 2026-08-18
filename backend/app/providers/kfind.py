@@ -19,7 +19,7 @@ from app.providers.errors import (
     KfindTimeoutError,
     KfindUnavailableError,
 )
-from app.providers.interfaces import ProviderName
+from app.providers.interfaces import FoodSearchProviderLocalization, ProviderName
 from app.providers.kfind_ranking import rank_kfind_results
 
 
@@ -34,6 +34,13 @@ MAX_PAGE_SIZE = 100
 KFIND_UPSTREAM_PAGE_FOR_RANKING = 1
 KFIND_FETCH_WINDOW_MULTIPLIER = 2
 KFIND_MAX_FETCH_SIZE = MAX_PAGE_SIZE
+KFIND_SEARCH_LOCALIZATION = FoodSearchProviderLocalization(
+    region="KR",
+    language="ko",
+    supports_korean_query=True,
+    requires_english_alias_for_korean_query=False,
+    max_page_size=MAX_PAGE_SIZE,
+)
 
 # Official reference: data.go.kr 15127578, output message document
 # `출력메세지_식품영양성분DB정보.xlsx`.
@@ -340,6 +347,17 @@ class KfindFoodProvider:
     @property
     def provider_name(self) -> ProviderName:
         return KFIND_DATA_SOURCE
+
+    @property
+    def search_localization(self) -> FoodSearchProviderLocalization:
+        return KFIND_SEARCH_LOCALIZATION
+
+    async def get_food(
+        self,
+        food_id: str,
+        serving_id: str | None = None,
+    ) -> FoodSearchRecord | None:
+        return None
 
     async def check_auth(self) -> None:
         payload = await self._client.get_json(

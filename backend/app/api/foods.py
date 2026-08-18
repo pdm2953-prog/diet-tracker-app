@@ -55,7 +55,7 @@ def _food_item_dto_from_record(
 ) -> FoodSearchItemDto:
     source_food_name = record.source_food_name or record.name
     localization = food_name_localizer.localize(source_food_name)
-    display_name = record.canonical_name or localization.display_name
+    display_name = record.canonical_name or record.display_name or localization.display_name
     was_localized = localization.was_localized
     display_locale = localization.display_locale
     localizer_name = localization.localizer_name

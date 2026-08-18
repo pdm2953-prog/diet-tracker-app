@@ -1,17 +1,28 @@
 ﻿from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 
 from app.models.food import FoodSearchRecord, NutritionSourceMetadata
-from app.providers.factory import get_food_provider
-from app.providers.interfaces import FoodProvider, FoodSearchProviderResponse
+from app.providers.factory import get_food_provider, get_kfind_food_provider
+from app.providers.interfaces import (
+    FoodProvider,
+    FoodSearchProviderLocalization,
+    FoodSearchProviderResponse,
+    ProviderName,
+)
 from app.services.korean_food_catalog import (
     CatalogNutritionSource,
     ExternalFoodRef,
     KoreanFoodCatalog,
     KoreanFoodCatalogItem,
     get_korean_food_catalog,
+)
+from app.providers.kfind import KFIND_DATA_SOURCE, KFIND_SEARCH_LOCALIZATION
+from app.services.provider_fallback import (
+    provider_failure_fallback_decision,
+    provider_response_fallback_decision,
 )
 from app.services.query_translation import (
     FoodSearchQueryTranslation,
@@ -42,11 +53,17 @@ class FoodSearchService:
         query_translator: FoodSearchQueryTranslator,
         identity_translator: FoodSearchQueryTranslator | None = None,
         korean_food_catalog: KoreanFoodCatalog | None = None,
+        primary_search_provider_factory: Callable[[], FoodProvider] | None = None,
+        primary_search_provider_name: ProviderName | None = None,
+        primary_search_localization: FoodSearchProviderLocalization | None = None,
     ) -> None:
         self._provider = provider
         self._query_translator = query_translator
         self._identity_translator = identity_translator or IdentityQueryTranslator()
         self._korean_food_catalog = korean_food_catalog or get_korean_food_catalog()
+        self._primary_search_provider_factory = primary_search_provider_factory
+        self._primary_search_provider_name = primary_search_provider_name
+        self._search_localization = primary_search_localization or provider.search_localization
 
     async def search_foods(
         self,
@@ -55,17 +72,143 @@ class FoodSearchService:
         page_size: int,
     ) -> FoodSearchServiceResponse:
         normalized_query = normalize_query_spacing(query)
+        primary_search_enabled = self._primary_search_provider_factory is not None
         normalized_page_size = self._normalize_provider_page_size(page_size)
         catalog_response = await self._search_catalog_foods(
             normalized_query,
             page,
             normalized_page_size,
+            include_provider_routes=not primary_search_enabled,
+            localization=self._search_localization,
         )
 
         if catalog_response is not None:
             return catalog_response
 
-        query_resolution = self._resolve_query(normalized_query)
+        query_resolution = self._resolve_query(normalized_query, self._search_localization)
+
+        if query_resolution.status == "unresolved":
+            return FoodSearchServiceResponse(
+                items=[],
+                page=page,
+                page_size=normalized_page_size,
+                has_more=False,
+                query=query_resolution,
+            )
+
+        if primary_search_enabled:
+            return await self._search_provider_chain(
+                primary_query=query_resolution.resolved,
+                primary_query_resolution=query_resolution,
+                fallback_query=normalized_query,
+                page=page,
+                requested_page_size=page_size,
+                primary_page_size=normalized_page_size,
+            )
+
+        provider_response = await self._provider.search_foods(
+            query_resolution.resolved,
+            page,
+            normalized_page_size,
+        )
+
+        return FoodSearchServiceResponse(
+            items=provider_response.items,
+            page=provider_response.page,
+            page_size=provider_response.page_size,
+            has_more=provider_response.has_more,
+            query=(
+                query_resolution
+                if query_resolution.should_include_response_metadata
+                else None
+            ),
+        )
+
+    async def _search_provider_chain(
+        self,
+        *,
+        primary_query: str,
+        primary_query_resolution: FoodSearchQueryTranslation,
+        fallback_query: str,
+        page: int,
+        requested_page_size: int,
+        primary_page_size: int,
+    ) -> FoodSearchServiceResponse:
+        primary_provider_factory = self._primary_search_provider_factory
+
+        if primary_provider_factory is None:
+            raise RuntimeError("primary search provider is not configured.")
+
+        provider_name = self._primary_search_provider_name or self._provider.provider_name
+
+        try:
+            primary_provider = primary_provider_factory()
+            provider_name = primary_provider.provider_name
+            primary_response = await primary_provider.search_foods(
+                primary_query,
+                page,
+                primary_page_size,
+            )
+        except Exception as error:
+            decision = provider_failure_fallback_decision(provider_name, error)
+
+            if not decision.should_fallback:
+                raise
+
+            return await self._search_fallback_provider(
+                fallback_query,
+                page,
+                requested_page_size,
+            )
+
+        decision = provider_response_fallback_decision(
+            primary_provider.provider_name,
+            primary_response.items,
+            operation="search",
+        )
+
+        if decision.should_fallback:
+            return await self._search_fallback_provider(
+                fallback_query,
+                page,
+                requested_page_size,
+            )
+
+        return FoodSearchServiceResponse(
+            items=primary_response.items,
+            page=primary_response.page,
+            page_size=primary_response.page_size,
+            has_more=primary_response.has_more,
+            query=(
+                primary_query_resolution
+                if primary_query_resolution.should_include_response_metadata
+                else None
+            ),
+        )
+
+    async def _search_fallback_provider(
+        self,
+        normalized_query: str,
+        page: int,
+        page_size: int,
+    ) -> FoodSearchServiceResponse:
+        fallback_localization = self._provider.search_localization
+        normalized_page_size = self._normalize_provider_page_size(
+            page_size,
+            fallback_localization,
+        )
+        catalog_response = await self._search_catalog_foods(
+            normalized_query,
+            page,
+            normalized_page_size,
+            include_provider_routes=True,
+            localization=fallback_localization,
+        )
+
+        if catalog_response is not None:
+            return catalog_response
+
+        query_resolution = self._resolve_query(normalized_query, fallback_localization)
 
         if query_resolution.status == "unresolved":
             return FoodSearchServiceResponse(
@@ -99,16 +242,23 @@ class FoodSearchService:
         normalized_query: str,
         page: int,
         page_size: int,
+        *,
+        include_provider_routes: bool = True,
+        localization: FoodSearchProviderLocalization | None = None,
     ) -> FoodSearchServiceResponse | None:
         catalog_item = self._korean_food_catalog.resolve(normalized_query)
 
         if catalog_item is None:
             return None
 
+        resolved_localization = localization or self._search_localization
         curated_response = self._curated_nutrition_response(catalog_item, page, page_size)
 
         if curated_response is not None:
             return curated_response
+
+        if not include_provider_routes:
+            return None
 
         provider_refs = catalog_item.refs_for_provider(self._provider.provider_name)
         direct_ref = self._select_direct_ref(catalog_item, provider_refs)
@@ -151,6 +301,7 @@ class FoodSearchService:
             catalog_item,
             page,
             page_size,
+            resolved_localization,
         )
 
     def _curated_nutrition_response(
@@ -256,6 +407,7 @@ class FoodSearchService:
         catalog_item: KoreanFoodCatalogItem,
         page: int,
         page_size: int,
+        localization: FoodSearchProviderLocalization,
     ) -> FoodSearchServiceResponse:
         return FoodSearchServiceResponse(
             items=[],
@@ -263,8 +415,15 @@ class FoodSearchService:
             page_size=page_size,
             has_more=False,
             query=(
-                self._unresolved_catalog_query(normalized_query, catalog_item)
-                if self._should_return_unresolved_catalog_query(normalized_query)
+                self._unresolved_catalog_query(
+                    normalized_query,
+                    catalog_item,
+                    localization,
+                )
+                if self._should_return_unresolved_catalog_query(
+                    normalized_query,
+                    localization,
+                )
                 else None
             ),
         )
@@ -281,9 +440,11 @@ class FoodSearchService:
             "canonical_name": catalog_item.canonical_name,
         })
 
-    def _should_return_unresolved_catalog_query(self, normalized_query: str) -> bool:
-        localization = self._provider.search_localization
-
+    def _should_return_unresolved_catalog_query(
+        self,
+        normalized_query: str,
+        localization: FoodSearchProviderLocalization,
+    ) -> bool:
         return (
             contains_hangul(normalized_query)
             and not localization.supports_korean_query
@@ -294,9 +455,8 @@ class FoodSearchService:
         self,
         normalized_query: str,
         catalog_item: KoreanFoodCatalogItem,
+        localization: FoodSearchProviderLocalization,
     ) -> FoodSearchQueryTranslation:
-        localization = self._provider.search_localization
-
         return FoodSearchQueryTranslation(
             original=normalized_query,
             resolved=catalog_item.canonical_name,
@@ -307,14 +467,18 @@ class FoodSearchService:
             target_language=localization.language,
         )
 
-    def _resolve_query(self, query: str) -> FoodSearchQueryTranslation:
+    def _resolve_query(
+        self,
+        query: str,
+        localization: FoodSearchProviderLocalization | None = None,
+    ) -> FoodSearchQueryTranslation:
         normalized_query = normalize_query_spacing(query)
-        localization = self._provider.search_localization
+        resolved_localization = localization or self._search_localization
 
         if (
             contains_hangul(normalized_query)
-            and not localization.supports_korean_query
-            and localization.requires_english_alias_for_korean_query
+            and not resolved_localization.supports_korean_query
+            and resolved_localization.requires_english_alias_for_korean_query
         ):
             return self._query_translator.translate(
                 normalized_query,
@@ -327,11 +491,16 @@ class FoodSearchService:
         return self._identity_translator.translate(
             normalized_query,
             source_language=source_language,
-            target_language=localization.language,
+            target_language=resolved_localization.language,
         )
 
-    def _normalize_provider_page_size(self, page_size: int) -> int:
-        max_page_size = self._provider.search_localization.max_page_size
+    def _normalize_provider_page_size(
+        self,
+        page_size: int,
+        localization: FoodSearchProviderLocalization | None = None,
+    ) -> int:
+        resolved_localization = localization or self._search_localization
+        max_page_size = resolved_localization.max_page_size
 
         if max_page_size is None:
             return page_size
@@ -345,10 +514,20 @@ def get_food_search_query_translator() -> FoodSearchQueryTranslator:
 
 
 def get_food_search_service() -> FoodSearchService:
+    provider = get_food_provider()
+    uses_fatsecret_provider = provider.provider_name == "fatsecret"
+
     return FoodSearchService(
-        provider=get_food_provider(),
+        provider=provider,
         query_translator=get_food_search_query_translator(),
         korean_food_catalog=get_korean_food_catalog(),
+        primary_search_provider_factory=(
+            get_kfind_food_provider if uses_fatsecret_provider else None
+        ),
+        primary_search_provider_name=(KFIND_DATA_SOURCE if uses_fatsecret_provider else None),
+        primary_search_localization=(
+            KFIND_SEARCH_LOCALIZATION if uses_fatsecret_provider else None
+        ),
     )
 
 
