@@ -7,9 +7,11 @@
   MealsByDate,
   Nutrition,
 } from './models';
+import { DEFAULT_NUTRITION_GOAL_TYPE, isNutritionGoalType } from './goalPresentation';
 import { mealTypes } from './meals';
 import { dailyTargets } from './nutrition';
 import type { DailyNutritionTargets } from './nutrition';
+import type { NutritionGoalType } from './nutritionGoals';
 import { isValidLocalDateString } from './utils/date';
 import { parseOptionalFoodDataSource } from './utils/foodDataSource';
 
@@ -18,6 +20,7 @@ export type AppDataSnapshot = {
   foods: Food[];
   hiddenFixedMealSourceKeys: HiddenFixedMealSourceKeysByDate;
   mealsByDate: MealsByDate;
+  nutritionGoalType: NutritionGoalType;
   todayTargets: DailyNutritionTargets;
 };
 
@@ -43,6 +46,7 @@ export function createDefaultAppDataSnapshot(
     foods,
     hiddenFixedMealSourceKeys: {},
     mealsByDate,
+    nutritionGoalType: DEFAULT_NUTRITION_GOAL_TYPE,
     todayTargets: dailyTargets,
   };
 }
@@ -54,6 +58,7 @@ export function serializeAppDataSnapshot(data: AppDataSnapshot): string {
     foods: data.foods,
     hiddenFixedMealSourceKeys: data.hiddenFixedMealSourceKeys,
     mealsByDate: data.mealsByDate,
+    nutritionGoalType: data.nutritionGoalType,
     todayTargets: data.todayTargets,
   };
 
@@ -86,6 +91,10 @@ export function restoreAppDataSnapshot(
         fallback.hiddenFixedMealSourceKeys,
       ),
       mealsByDate: parseMealsByDate(parsedValue.mealsByDate, fallback.mealsByDate),
+      nutritionGoalType: parseNutritionGoalType(
+        parsedValue.nutritionGoalType,
+        fallback.nutritionGoalType,
+      ),
       todayTargets: parseDailyNutritionTargets(
         parsedValue.todayTargets,
         fallback.todayTargets,
@@ -142,6 +151,13 @@ function getLocalStorageAdapter(): StorageAdapter | null {
   };
 
   return globalValue.localStorage ?? null;
+}
+
+function parseNutritionGoalType(
+  value: unknown,
+  fallback: NutritionGoalType,
+): NutritionGoalType {
+  return isNutritionGoalType(value) ? value : fallback;
 }
 
 function parseDailyNutritionTargets(

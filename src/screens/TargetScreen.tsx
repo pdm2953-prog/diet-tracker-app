@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 
 import {
@@ -116,15 +116,27 @@ const DEFAULT_GOAL_FORM: GoalFormState = {
 };
 
 type TargetScreenProps = {
+  currentGoalType: NutritionGoalType;
   currentTargets: DailyNutritionTargets;
-  onTargetsChange: (targets: DailyNutritionTargets) => void;
+  onTargetsChange: (targets: DailyNutritionTargets, goalType: NutritionGoalType) => void;
 };
 
 export function TargetScreen({
+  currentGoalType,
   currentTargets,
   onTargetsChange,
 }: TargetScreenProps) {
-  const [goalForm, setGoalForm] = useState<GoalFormState>(DEFAULT_GOAL_FORM);
+  const [goalForm, setGoalForm] = useState<GoalFormState>(() => ({
+    ...DEFAULT_GOAL_FORM,
+    goal: currentGoalType,
+  }));
+  useEffect(() => {
+    setGoalForm((currentGoalForm) => ({
+      ...currentGoalForm,
+      goal: currentGoalType,
+    }));
+  }, [currentGoalType]);
+
   const goalRecommendation = useMemo(
     () => calculateNutritionGoalRecommendation({
       ageYears: parseNumberInput(goalForm.ageYears),
@@ -159,6 +171,7 @@ export function TargetScreen({
   const applyRecommendedTargets = () => {
     onTargetsChange(
       applyNutritionGoalRecommendationTargets(currentTargets, goalRecommendation),
+      goalForm.goal,
     );
   };
 

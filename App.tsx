@@ -14,6 +14,8 @@ import {
 } from './src/fixedMeals';
 import { shouldPersistAppDataSnapshot, shouldRenderInteractiveApp } from './src/appHydration';
 import { getMealsForDate } from './src/meals';
+import { bottomTabs, getGoalSetupScreenKey } from './src/navigation';
+import type { ScreenKey } from './src/navigation';
 import { createMockTodayData } from './src/mockTodayData';
 import type {
   FixedMealTemplate,
@@ -25,6 +27,7 @@ import type {
   MealType,
 } from './src/models';
 import type { DailyNutritionTargets } from './src/nutrition';
+import type { NutritionGoalType } from './src/nutritionGoals';
 import { BottomTabItem } from './src/components/ui';
 import { CalendarScreen } from './src/screens/CalendarScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -39,23 +42,16 @@ import { styles } from './src/styles';
 import { getLocalDateString } from './src/utils/format';
 
 
-type ScreenKey = 'today' | 'calendar' | 'target' | 'settings';
-
 type InitialAppState = {
   fixedMealTemplates: FixedMealTemplate[];
   foods: Food[];
   hiddenFixedMealSourceKeys: HiddenFixedMealSourceKeysByDate;
   mealsByDate: MealsByDate;
+  nutritionGoalType: NutritionGoalType;
   selectedDate: string;
   todayTargets: DailyNutritionTargets;
 };
 
-const screenTabs: Array<{ icon: string; key: ScreenKey; label: string }> = [
-  { icon: '●', key: 'today', label: '오늘' },
-  { icon: '▦', key: 'calendar', label: '식단 일정' },
-  { icon: '◎', key: 'target', label: '목표' },
-  { icon: '⚙', key: 'settings', label: '설정' },
-];
 
 const screenPaneStyle: ViewStyle = { flex: 1 };
 const hiddenScreenPaneStyle: ViewStyle = { display: 'none' };
@@ -73,6 +69,7 @@ function createInitialAppState(): InitialAppState {
     foods: fallbackData.foods,
     hiddenFixedMealSourceKeys: fallbackData.hiddenFixedMealSourceKeys,
     mealsByDate: fallbackData.mealsByDate,
+    nutritionGoalType: fallbackData.nutritionGoalType,
     todayTargets: fallbackData.todayTargets,
   };
 }
@@ -107,6 +104,9 @@ export default function App() {
   const [todayTargets, setTodayTargets] = useState<DailyNutritionTargets>(
     initialAppState.todayTargets,
   );
+  const [nutritionGoalType, setNutritionGoalType] = useState<NutritionGoalType>(
+    initialAppState.nutritionGoalType,
+  );
   const [storageLoaded, setStorageLoaded] = useState(false);
   const visibleFoods = useMemo(
     () => mergeFoodsById(foods, fixedMealTemplates),
@@ -140,6 +140,7 @@ export default function App() {
       foods: initialAppState.foods,
       hiddenFixedMealSourceKeys: initialAppState.hiddenFixedMealSourceKeys,
       mealsByDate: initialAppState.mealsByDate,
+      nutritionGoalType: initialAppState.nutritionGoalType,
       todayTargets: initialAppState.todayTargets,
     };
 
@@ -152,6 +153,7 @@ export default function App() {
       setFoods(restoredData.foods);
       setHiddenFixedMealSourceKeys(restoredData.hiddenFixedMealSourceKeys);
       setMealsByDate(restoredData.mealsByDate);
+      setNutritionGoalType(restoredData.nutritionGoalType);
       setTodayTargets(restoredData.todayTargets);
       setStorageLoaded(true);
     });
@@ -171,9 +173,10 @@ export default function App() {
       foods,
       hiddenFixedMealSourceKeys,
       mealsByDate,
+      nutritionGoalType,
       todayTargets,
     });
-  }, [fixedMealTemplates, foods, hiddenFixedMealSourceKeys, mealsByDate, storageLoaded, todayTargets]);
+  }, [fixedMealTemplates, foods, hiddenFixedMealSourceKeys, mealsByDate, nutritionGoalType, storageLoaded, todayTargets]);
 
   const updateSelectedDateMeals = (
     updatedAt: string,
@@ -257,6 +260,14 @@ export default function App() {
     );
   };
 
+  const applyTargetsFromGoalSetup = (
+    targets: DailyNutritionTargets,
+    goalType: NutritionGoalType,
+  ) => {
+    setTodayTargets(targets);
+    setNutritionGoalType(goalType);
+  };
+
   if (!shouldRenderInteractiveApp(storageLoaded)) {
     return (
       <SafeAreaView style={styles.root}>
@@ -290,6 +301,7 @@ export default function App() {
           <CalendarScreen
             fixedMealTemplates={fixedMealTemplates}
             foods={visibleFoods}
+
             hiddenFixedMealSourceKeys={hiddenFixedMealSourceKeys}
             mealsByDate={mealsByDate}
             onOpenToday={() => setActiveTab('today')}
@@ -300,14 +312,19 @@ export default function App() {
         </View>
         <View style={[screenPaneStyle, activeTab !== 'target' ? hiddenScreenPaneStyle : null]}>
           <TargetScreen
+            currentGoalType={nutritionGoalType}
             currentTargets={todayTargets}
-            onTargetsChange={(targets) => setTodayTargets(targets)}
+            onTargetsChange={applyTargetsFromGoalSetup}
           />
         </View>
         <View style={[screenPaneStyle, activeTab !== 'settings' ? hiddenScreenPaneStyle : null]}>
           <SettingsScreen
             fixedMealTemplates={fixedMealTemplates}
             foods={visibleFoods}
+            nutritionGoalType={nutritionGoalType}
+            onOpenGoalSetup={() => setActiveTab(getGoalSetupScreenKey())}
+            targets={todayTargets}
+
             onRemoveFixedMealTemplate={removeFixedMealTemplate}
             onToggleFixedMealTemplate={toggleFixedMealTemplate}
           />
@@ -315,7 +332,7 @@ export default function App() {
       </View>
 
       <View style={styles.tabBar}>
-        {screenTabs.map((tab) => (
+        {bottomTabs.map((tab) => (
           <BottomTabItem
             icon={tab.icon}
             key={tab.key}

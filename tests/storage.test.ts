@@ -68,6 +68,7 @@ const fallback: AppDataSnapshot = {
   foods: [food],
   hiddenFixedMealSourceKeys: {},
   mealsByDate: { '2026-07-23': [meal] },
+  nutritionGoalType: 'maintain',
   todayTargets: {
     caloriesKcal: 2000,
     proteinG: 100,
@@ -99,6 +100,7 @@ test('restoreAppDataSnapshot round-trips valid versioned local data', () => {
     foods: [food],
     hiddenFixedMealSourceKeys: { '2026-07-23': ['template-storage:item-storage'] },
     mealsByDate: { '2026-07-23': [meal] },
+    nutritionGoalType: 'maintain',
     todayTargets: {
       caloriesKcal: 2100,
       proteinG: 110,
@@ -108,6 +110,33 @@ test('restoreAppDataSnapshot round-trips valid versioned local data', () => {
   };
 
   assert.deepEqual(restoreAppDataSnapshot(serializeAppDataSnapshot(data), fallback), data);
+});
+
+test('restoreAppDataSnapshot falls back to current goal type for legacy or invalid stored values', () => {
+  const fallbackWithGoal: AppDataSnapshot = {
+    ...fallback,
+    nutritionGoalType: 'diet',
+  };
+  const legacyRawValue = JSON.stringify({
+    version: 1,
+    fixedMealTemplates: [],
+    foods: [food],
+    hiddenFixedMealSourceKeys: {},
+    mealsByDate: { '2026-07-23': [meal] },
+    todayTargets: fallback.todayTargets,
+  });
+  const invalidRawValue = JSON.stringify({
+    version: 1,
+    fixedMealTemplates: [],
+    foods: [food],
+    hiddenFixedMealSourceKeys: {},
+    mealsByDate: { '2026-07-23': [meal] },
+    nutritionGoalType: 'view',
+    todayTargets: fallback.todayTargets,
+  });
+
+  assert.equal(restoreAppDataSnapshot(legacyRawValue, fallbackWithGoal).nutritionGoalType, 'diet');
+  assert.equal(restoreAppDataSnapshot(invalidRawValue, fallbackWithGoal).nutritionGoalType, 'diet');
 });
 
 test('restoreAppDataSnapshot preserves curated nutrition source metadata', () => {
@@ -139,6 +168,7 @@ test('restoreAppDataSnapshot preserves curated nutrition source metadata', () =>
     foods: [curatedFood],
     hiddenFixedMealSourceKeys: {},
     mealsByDate: {},
+    nutritionGoalType: 'maintain',
     todayTargets: fallback.todayTargets,
   };
 
@@ -208,6 +238,7 @@ test('restoreAppDataSnapshot preserves official soondubu curated food and meal n
     foods: [soondubuFood],
     hiddenFixedMealSourceKeys: {},
     mealsByDate: { '2026-08-09': [soondubuMeal] },
+    nutritionGoalType: 'maintain',
     todayTargets: fallback.todayTargets,
   };
 
@@ -251,6 +282,7 @@ test('restoreAppDataSnapshot preserves future dataSource values without dropping
     foods: [futureFood],
     hiddenFixedMealSourceKeys: {},
     mealsByDate: { '2026-07-23': [futureMeal] },
+    nutritionGoalType: 'maintain',
     todayTargets: fallback.todayTargets,
   };
 
@@ -282,6 +314,7 @@ test('restoreAppDataSnapshot omits malformed dataSource without dropping stored 
     foods: [malformedFood],
     hiddenFixedMealSourceKeys: {},
     mealsByDate: { '2026-07-23': [malformedMeal] },
+    nutritionGoalType: 'maintain',
     todayTargets: fallback.todayTargets,
   });
 
@@ -305,6 +338,7 @@ test('restoreAppDataSnapshot safely falls back for invalid stored fields', () =>
     foods: [{ id: 'bad-food' }],
     hiddenFixedMealSourceKeys: { 'not-a-date': [123] },
     mealsByDate: { '2026-02-29': [] },
+    nutritionGoalType: 'maintain',
     todayTargets: { caloriesKcal: '2000' },
   }), fallback);
 

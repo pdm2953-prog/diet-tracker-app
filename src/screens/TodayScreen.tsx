@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { FoodPortionModal } from '../components/FoodPortionModal';
 import type { FoodPortionModalState } from '../components/FoodPortionModal';
 import { FoodSearchPanel } from '../components/FoodSearchPanel';
 import { MealSection } from '../components/MealSection';
 import { NutritionSummaryPanel } from '../components/NutritionSummaryPanel';
-import { PrimaryButton, SecondaryButton, StatusBadge } from '../components/ui';
-import type { StatusBadgeTone } from '../components/ui';
 import { GRAM_ADJUST_STEP } from '../constants';
 import { isFixedMealFood } from '../fixedMeals';
 import {
@@ -368,52 +366,58 @@ export function TodayScreen({
   };
 
   const selectedDateIsToday = selectedDate === currentToday;
-  const selectedDateStatusLabel = getSelectedDateStatusLabel(selectedDateIsToday, shouldEvaluateSelectedDate);
-  const selectedDateStatusTone = getSelectedDateStatusTone(selectedDateIsToday, shouldEvaluateSelectedDate);
-  const selectedDateHelpText = getSelectedDateHelpText(selectedDateIsToday, shouldEvaluateSelectedDate);
   const foodSearchIsVisible = portionModal === null;
 
   return (
     <>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.eyebrow}>Today</Text>
-          <View style={styles.todayHeaderRow}>
-            <View style={styles.todayHeaderTextBlock}>
-              <Text style={styles.title}>{formatDateLabel(selectedDate)}</Text>
-              <Text style={styles.dateText}>{selectedDateHelpText}</Text>
-            </View>
-            <StatusBadge label={selectedDateStatusLabel} tone={selectedDateStatusTone} />
+        <View style={styles.todayHeader}>
+          <View style={styles.todayHeaderTextBlock}>
+            <Text style={styles.todayScreenTitle}>Today</Text>
+            <Text style={styles.todayDateText}>{formatDateLabel(selectedDate)}</Text>
           </View>
-          <View style={styles.dateControlRow}>
-            <SecondaryButton
+          <View style={styles.todayDateNav}>
+            <Pressable
               accessibilityLabel="이전 날짜로 이동"
-              label="이전"
+              accessibilityRole="button"
               onPress={() => changeSelectedDate(-1)}
-              style={styles.dateControlButton}
-            />
-            {selectedDateIsToday ? (
-              <PrimaryButton
-                accessibilityLabel="오늘 날짜 선택됨"
-                label="오늘"
-                onPress={returnToToday}
-                style={[styles.dateControlButton, styles.dateControlButtonActive]}
-                textStyle={styles.dateControlButtonTextActive}
-              />
-            ) : (
-              <SecondaryButton
-                accessibilityLabel="오늘 날짜로 이동"
-                label="오늘"
-                onPress={returnToToday}
-                style={styles.dateControlButton}
-              />
-            )}
-            <SecondaryButton
+              style={({ pressed }) => [
+                styles.dateNavButton,
+                pressed ? styles.dateNavButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.dateNavButtonText}>‹</Text>
+            </Pressable>
+            <Pressable
+              accessibilityLabel={selectedDateIsToday ? '오늘 날짜 선택됨' : '오늘 날짜로 이동'}
+              accessibilityRole="button"
+              onPress={returnToToday}
+              style={({ pressed }) => [
+                styles.dateNavTodayButton,
+                selectedDateIsToday ? styles.dateNavTodayButtonActive : null,
+                pressed ? styles.dateNavButtonPressed : null,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.dateNavTodayButtonText,
+                  selectedDateIsToday ? styles.dateNavTodayButtonTextActive : null,
+                ]}
+              >
+                오늘
+              </Text>
+            </Pressable>
+            <Pressable
               accessibilityLabel="다음 날짜로 이동"
-              label="다음"
+              accessibilityRole="button"
               onPress={() => changeSelectedDate(1)}
-              style={styles.dateControlButton}
-            />
+              style={({ pressed }) => [
+                styles.dateNavButton,
+                pressed ? styles.dateNavButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.dateNavButtonText}>›</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -475,14 +479,11 @@ export function TodayScreen({
 
 function ScheduledMealNoticePanel() {
   return (
-    <View style={styles.statusBanner}>
-      <StatusBadge icon="•" label="예정" tone="scheduled" />
-      <View style={styles.statusBannerTextBlock}>
-        <Text style={styles.statusBannerTitle}>예정된 식단입니다</Text>
-        <Text style={styles.statusBannerMessage}>
-          미래 날짜는 실제 섭취 평가를 하지 않습니다. 고정 식단은 예정 목록으로 표시되며, 체크한 음식만 섭취량 합계에 반영됩니다.
-        </Text>
-      </View>
+    <View style={styles.inlineStatus}>
+      <Text style={styles.inlineStatusIcon}>•</Text>
+      <Text style={styles.inlineStatusText}>
+        예정된 식단 · 고정 식단은 예정 목록으로 표시되며 체크한 음식만 합계에 반영됩니다.
+      </Text>
     </View>
   );
 }
@@ -492,72 +493,29 @@ type MealEvaluationPanelProps = {
 };
 
 function MealEvaluationPanel({ evaluation }: MealEvaluationPanelProps) {
+  const statusLabel = mealEvaluationStatusLabels[evaluation.status];
+  const message = evaluation.messages.length > 0
+    ? ` · ${evaluation.messages.join(' · ')}`
+    : '';
+
   return (
-    <View style={styles.statusBanner}>
-      <StatusBadge
-        label={mealEvaluationStatusLabels[evaluation.status]}
-        tone={getEvaluationStatusBadgeTone(evaluation)}
-      />
-      <View style={styles.statusBannerTextBlock}>
-        <View style={styles.statusBannerTitleRow}>
-          <Text style={styles.statusBannerTitle}>식단 평가</Text>
-          <Text style={styles.statusBannerScore}>{evaluation.score}점</Text>
-        </View>
-        <View style={styles.evaluationMessageList}>
-          {evaluation.messages.map((message, index) => (
-            <Text key={`${evaluation.status}-${index}-${message}`} style={styles.statusBannerMessage}>
-              - {message}
-            </Text>
-          ))}
-        </View>
-      </View>
+    <View style={styles.inlineStatus}>
+      <Text style={[styles.inlineStatusIcon, getEvaluationInlineStatusIconStyle(evaluation)]}>•</Text>
+      <Text style={styles.inlineStatusText}>
+        식단 평가 {evaluation.score}점 · {statusLabel}{message}
+      </Text>
     </View>
   );
 }
 
-function getSelectedDateStatusLabel(
-  selectedDateIsToday: boolean,
-  shouldEvaluateSelectedDate: boolean,
-): string {
-  if (!shouldEvaluateSelectedDate) {
-    return '예정';
-  }
-
-  return selectedDateIsToday ? '오늘' : '기록일';
-}
-
-function getSelectedDateStatusTone(
-  selectedDateIsToday: boolean,
-  shouldEvaluateSelectedDate: boolean,
-): StatusBadgeTone {
-  if (!shouldEvaluateSelectedDate) {
-    return 'scheduled';
-  }
-
-  return selectedDateIsToday ? 'success' : 'info';
-}
-
-function getSelectedDateHelpText(
-  selectedDateIsToday: boolean,
-  shouldEvaluateSelectedDate: boolean,
-): string {
-  if (!shouldEvaluateSelectedDate) {
-    return '예정된 식단을 확인하고 필요한 음식을 미리 준비합니다.';
-  }
-
-  return selectedDateIsToday
-    ? '오늘 먹은 음식만 체크하면 칼로리와 영양 목표가 즉시 반영됩니다.'
-    : '선택한 날짜의 아침, 점심, 저녁 기록을 확인합니다.';
-}
-
-function getEvaluationStatusBadgeTone(evaluation: MealEvaluationResult): StatusBadgeTone {
+function getEvaluationInlineStatusIconStyle(evaluation: MealEvaluationResult) {
   if (evaluation.status === 'excellent' || evaluation.status === 'good') {
-    return 'success';
+    return styles.inlineStatusIconSuccess;
   }
 
   if (evaluation.status === 'low' || evaluation.status === 'high') {
-    return 'warning';
+    return styles.inlineStatusIconWarning;
   }
 
-  return 'danger';
+  return styles.inlineStatusIconDanger;
 }

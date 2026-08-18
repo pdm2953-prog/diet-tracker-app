@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import {
   Card,
   EmptyState,
-  NoticeBox,
   PrimaryButton,
   SecondaryButton,
   SectionHeader,
@@ -13,7 +12,10 @@ import {
 import { mealLabels } from '../constants';
 import { mealTypes } from '../meals';
 import type { FixedMealTemplate, Food, MealType } from '../models';
+import type { DailyNutritionTargets } from '../nutrition';
 import { formatNutritionValue } from '../nutrition';
+import { createSettingsGoalEntryModel } from '../goalPresentation';
+import type { NutritionGoalType } from '../nutritionGoals';
 import { styles } from '../styles';
 import { formatAmountLabel } from '../utils/format';
 import { getFoodDisplayName } from '../utils/foodDisplay';
@@ -21,15 +23,21 @@ import { getFoodDisplayName } from '../utils/foodDisplay';
 type SettingsScreenProps = {
   fixedMealTemplates: FixedMealTemplate[];
   foods: Food[];
+  nutritionGoalType: NutritionGoalType;
+  onOpenGoalSetup: () => void;
   onRemoveFixedMealTemplate: (templateId: string) => void;
   onToggleFixedMealTemplate: (templateId: string) => void;
+  targets: DailyNutritionTargets;
 };
 
 export function SettingsScreen({
   fixedMealTemplates,
   foods,
+  nutritionGoalType,
+  onOpenGoalSetup,
   onRemoveFixedMealTemplate,
   onToggleFixedMealTemplate,
+  targets,
 }: SettingsScreenProps) {
   const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState<string | null>(null);
   const foodsById = useMemo(
@@ -39,6 +47,10 @@ export function SettingsScreen({
   const templatesByMealType = useMemo(
     () => groupFixedMealTemplatesByMealType(fixedMealTemplates),
     [fixedMealTemplates],
+  );
+  const goalEntry = useMemo(
+    () => createSettingsGoalEntryModel(targets, nutritionGoalType),
+    [nutritionGoalType, targets],
   );
 
   const confirmRemoveFixedMealTemplate = (templateId: string) => {
@@ -55,24 +67,34 @@ export function SettingsScreen({
       </View>
 
       <View style={styles.settingsStack}>
-        <Card style={styles.settingsSectionCard}>
-          <SectionHeader
-            subtitle="목표 추천에 쓰는 기본 기준은 Target 탭에서 관리합니다."
-            title="프로필"
-          />
-          <View style={styles.settingsList}>
-            <SettingsInfoRow
-              description="나이, 성별, 신장, 체중, 활동량을 기준으로 추천 목표를 계산합니다."
-              label="목표 계산 프로필"
-              value="Target에서 관리"
-            />
-            <SettingsInfoRow
-              description="현재 식단 기록은 선택한 날짜별로 분리되어 저장됩니다."
-              label="기록 기준"
-              value="날짜별 저장"
-            />
-          </View>
-        </Card>
+        <View style={styles.settingsGoalSection}>
+          <Text style={styles.settingsGoalSectionTitle}>{goalEntry.title}</Text>
+          <Pressable
+            accessibilityLabel="목표 및 영양 목표 재설정"
+            accessibilityRole="button"
+            onPress={onOpenGoalSetup}
+            style={({ pressed }) => [
+              styles.settingsGoalEntry,
+              pressed ? styles.settingsGoalEntryPressed : null,
+            ]}
+            testID="settings-goal-entry"
+          >
+            <View style={styles.settingsGoalRow}>
+              <Text style={styles.settingsGoalLabel}>현재 목표</Text>
+              <Text style={styles.settingsGoalValue}>{goalEntry.currentGoalLabel}</Text>
+            </View>
+            <View style={styles.settingsGoalDivider} />
+            <View style={styles.settingsGoalRow}>
+              <Text style={styles.settingsGoalLabel}>하루 목표</Text>
+              <Text style={styles.settingsGoalValue}>{goalEntry.dailyCalorieGoalLabel}</Text>
+            </View>
+            <View style={styles.settingsGoalDivider} />
+            <View style={styles.settingsGoalRow}>
+              <Text style={styles.settingsGoalActionText}>{goalEntry.resetLabel}</Text>
+              <Text style={styles.settingsGoalChevron}>›</Text>
+            </View>
+          </Pressable>
+        </View>
 
         <Card style={styles.settingsSectionCard}>
           <SectionHeader

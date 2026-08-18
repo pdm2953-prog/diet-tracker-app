@@ -8,16 +8,18 @@ import { normalizeConsumedGrams } from '../meals';
 import type { Food, Meal, MealFood, MealSummary, MealType } from '../models';
 import {
   formatNutritionNumber,
-  formatNutritionValue,
   nutritionLabels,
   nutritionUnits,
   primaryNutritionFields,
 } from '../nutrition';
 import { styles } from '../styles';
-import { formatAmountLabel, formatServingText } from '../utils/format';
+import {
+  createMealSectionModel,
+  formatCompactNutritionWithUnit,
+} from '../todayPresentation';
+import { formatAmountLabel } from '../utils/format';
 import { getDevelopmentSourceFoodName, getFoodDisplayName } from '../utils/foodDisplay';
-import { isPrimaryNutritionField } from '../utils/nutritionUi';
-import { EmptyState, IconButton, StatusBadge } from './ui';
+import { EmptyState } from './ui';
 
 type MealSectionProps = {
   foodsById: Record<string, Food>;
@@ -44,45 +46,21 @@ export function MealSection({
   searchPanel,
   summary,
 }: MealSectionProps) {
-  const calories = summary?.checkedNutritionTotal.caloriesKcal ?? null;
-  const protein = summary?.checkedNutritionTotal.proteinG ?? null;
-  const checkedCount = summary?.checkedCount ?? 0;
-  const totalCount = summary?.totalCount ?? meal.foods.length;
-  const hasMissingNutrition = summary?.missingNutritionFields.some((field) =>
-    isPrimaryNutritionField(field),
-  ) ?? false;
+  const mealModel = createMealSectionModel(meal.foods.length, summary);
 
   return (
     <View style={styles.mealSection}>
       <View style={styles.mealHeader}>
         <View style={styles.mealTitleBlock}>
           <Text style={styles.mealTitle}>{mealLabels[meal.type]}</Text>
-          <Text style={styles.mealStatus}>체크한 음식 {checkedCount}개 / 전체 {totalCount}개</Text>
+          <Text style={styles.mealStatus}>{mealModel.completionLabel}</Text>
         </View>
-        <View style={styles.mealHeaderActions}>
-          {hasMissingNutrition ? (
-            <StatusBadge icon="!" label="영양정보 일부 없음" tone="warning" />
-          ) : null}
-          <IconButton
-            accessibilityLabel={`${mealLabels[meal.type]} 음식 추가`}
-            icon="+"
-            label="추가"
-            onPress={() => onOpenSearch(meal.type)}
-            tone="primary"
-          />
-        </View>
+        <Text style={styles.mealKcalText}>{mealModel.calorieLabel}</Text>
       </View>
 
-      <View style={styles.mealSummaryRow}>
-        <Text style={styles.mealSummaryText}>
-          칼로리 {formatNutritionValue('caloriesKcal', calories)}
-        </Text>
-        <Text style={styles.mealSummaryText}>
-          단백질 {formatNutritionValue('proteinG', protein)}
-        </Text>
-      </View>
-
-      {searchPanel}
+      {mealModel.hasMissingNutrition ? (
+        <Text style={styles.mealInlineWarning}>일부 음식의 영양정보가 합산에서 제외됐습니다.</Text>
+      ) : null}
 
       <View style={styles.foodList}>
         {meal.foods.length > 0 ? (
@@ -102,11 +80,26 @@ export function MealSection({
         ) : (
           <EmptyState
             icon="+"
-            message="오른쪽 추가 버튼으로 음식을 기록할 수 있습니다."
+            message="음식 추가 버튼으로 아침, 점심, 저녁 기록을 시작할 수 있습니다."
             title="추가된 음식 없음"
           />
         )}
       </View>
+
+      <Pressable
+        accessibilityLabel={`${mealLabels[meal.type]} 음식 추가`}
+        accessibilityRole="button"
+        onPress={() => onOpenSearch(meal.type)}
+        style={({ pressed }) => [
+          styles.addFoodCompactButton,
+          pressed ? styles.addFoodCompactButtonPressed : null,
+        ]}
+      >
+        <Text style={styles.addFoodCompactIcon}>+</Text>
+        <Text style={styles.addFoodCompactText}>음식 추가</Text>
+      </Pressable>
+
+      {searchPanel}
     </View>
   );
 }
@@ -140,7 +133,7 @@ function FoodRow({
   const fixedMealFood = isFixedMealFood(mealFood);
   const foodName = food === undefined ? '알 수 없는 음식' : getFoodDisplayName(food);
   const sourceFoodName = food === undefined ? null : getDevelopmentSourceFoodName(food);
-  const calories = formatNutritionValue('caloriesKcal', totalNutrition.caloriesKcal);
+  const calories = formatCompactNutritionWithUnit('caloriesKcal', totalNutrition.caloriesKcal);
   const handleDecrease = (event: GestureResponderEvent) => {
     event.stopPropagation();
     onDecreaseGrams();
@@ -183,12 +176,10 @@ function FoodRow({
                 <Text style={styles.fixedMealBadge}>고정 식단</Text>
               ) : null}
             </View>
+            <Text style={styles.foodMeta}>{formatAmountLabel(consumedGrams)}g</Text>
             {sourceFoodName !== null ? (
               <Text style={styles.foodSourceName}>{sourceFoodName}</Text>
             ) : null}
-            <Text style={styles.foodMeta}>
-              {formatAmountLabel(consumedGrams)}g · {food?.category ?? '분류 없음'} · 기준 {food ? formatServingText(food) : '정보 없음'}
-            </Text>
           </View>
           <Text style={styles.foodKcalText}>{calories}</Text>
         </View>
