@@ -392,3 +392,52 @@ test('promoting an inactive equivalent fixed meal reactivates it instead of dupl
   assert.equal(reactivatedPromotion.fixedMealTemplates[0].id, promotion.fixedMealTemplates[0].id);
   assert.equal(reactivatedPromotion.fixedMealTemplates[0].isActive, true);
 });
+
+test('fixed meal source identity keeps different templates and items independent for the same food', () => {
+  const food = makeFood('food-same-source');
+  const firstPromotion = promoteDirectMealFood({
+    food,
+    mealFood: makeMealFood({ food, id: 'same-food-100g', consumedGrams: 100 }),
+    weekdays: ['mon'],
+  });
+  const secondPromotion = promoteDirectMealFood({
+    fixedMealTemplates: firstPromotion.fixedMealTemplates,
+    food,
+    mealFood: makeMealFood({ food, id: 'same-food-120g', consumedGrams: 120 }),
+    weekdays: ['mon'],
+  });
+  const manualMultiItemTemplate: FixedMealTemplate = {
+    ...secondPromotion.fixedMealTemplates[0],
+    id: 'manual-two-item-template',
+    items: [
+      {
+        ...secondPromotion.fixedMealTemplates[0].items[0],
+        id: 'manual-item-a',
+        consumedGrams: 130,
+      },
+      {
+        ...secondPromotion.fixedMealTemplates[0].items[0],
+        id: 'manual-item-b',
+        consumedGrams: 140,
+      },
+    ],
+  };
+  const projectedMeals = applyFixedMealTemplatesToMeals({
+    date: '2026-08-17',
+    fixedMealTemplates: [...secondPromotion.fixedMealTemplates, manualMultiItemTemplate],
+    hiddenSourceKeys: [],
+    meals: createEmptyMealsForDate('2026-08-17', timestamp),
+    timestamp,
+  });
+  const projectedFoods = projectedMeals.flatMap((meal) => meal.foods);
+  const sourceKeys = projectedFoods.map((mealFood) => mealFood.sourceKey);
+
+  assert.equal(projectedFoods.length, 4);
+  assert.deepEqual(new Set(sourceKeys).size, 4);
+  assert.deepEqual(projectedFoods.map((mealFood) => mealFood.foodId), [
+    'food-same-source',
+    'food-same-source',
+    'food-same-source',
+    'food-same-source',
+  ]);
+});

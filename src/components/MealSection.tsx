@@ -111,6 +111,7 @@ export function MealSection({
             pressed ? styles.addFoodCompactButtonPressed : null,
           ]}
         >
+          <Text style={styles.fixedMealManageIcon}>↻</Text>
           <Text style={styles.fixedMealManageButtonText}>{mealSectionActionLabels.manageFixedMeals}</Text>
         </Pressable>
       </View>

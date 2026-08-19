@@ -7,7 +7,7 @@ import {
   restoreAppDataSnapshot,
   serializeAppDataSnapshot,
 } from '../src/storage';
-import type { Food, Meal, Nutrition } from '../src/models';
+import type { FixedMealTemplate, Food, Meal, Nutrition } from '../src/models';
 import { createZeroNutrition } from '../src/nutrition';
 
 const timestamp = '2026-07-23T00:00:00.000Z';
@@ -390,4 +390,106 @@ test('restoreAppDataSnapshot hydrates legacy and invalid fixed meal weekdays as 
   assert.deepEqual(restored.fixedMealTemplates[0]?.weekdays, allFixedMealWeekdays);
   assert.deepEqual(restored.fixedMealTemplates[1]?.weekdays, allFixedMealWeekdays);
   assert.deepEqual(restored.fixedMealTemplates[2]?.weekdays, ['mon', 'wed']);
+});
+
+test('restoreAppDataSnapshot normalizes malformed fixed meal weekday arrays without dropping templates', () => {
+  const baseTemplate = {
+    id: 'weekday-normalization-template',
+    name: 'weekday normalization template',
+    mealType: 'breakfast',
+    schedule: 'daily',
+    isActive: true,
+    items: [{
+      id: 'weekday-normalization-item',
+      foodId: food.id,
+      foodSnapshot: food,
+      consumedGrams: 100,
+      calculatedNutrition: makeNutrition({ caloriesKcal: 100, proteinG: 10 }),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const rawValue = JSON.stringify({
+    version: 1,
+    fixedMealTemplates: [
+      { ...baseTemplate, id: 'duplicate-weekdays-template', weekdays: ['wed', 'mon', 'mon'] },
+      { ...baseTemplate, id: 'non-array-weekdays-template', weekdays: 'mon' },
+      { ...baseTemplate, id: 'fully-invalid-weekdays-template', weekdays: ['bogus'] },
+    ],
+    foods: [food],
+    hiddenFixedMealSourceKeys: {},
+    mealsByDate: {},
+    nutritionGoalType: 'maintain',
+    todayTargets: fallback.todayTargets,
+  });
+
+  const restored = restoreAppDataSnapshot(rawValue, fallback);
+
+  assert.equal(restored.fixedMealTemplates.length, 3);
+  assert.deepEqual(restored.fixedMealTemplates[0]?.weekdays, ['mon', 'wed']);
+  assert.deepEqual(restored.fixedMealTemplates[1]?.weekdays, allFixedMealWeekdays);
+  assert.deepEqual(restored.fixedMealTemplates[2]?.weekdays, allFixedMealWeekdays);
+});
+
+test('fixed meal recurrence edits, inactive state, presets, and deletes persist through storage hydration', () => {
+  const baseTemplate: FixedMealTemplate = {
+    id: 'weekday-edit-template',
+    name: 'weekday edit template',
+    mealType: 'breakfast' as const,
+    schedule: 'daily' as const,
+    weekdays: ['mon', 'wed'],
+    isActive: true,
+    items: [{
+      id: 'weekday-edit-item',
+      foodId: food.id,
+      foodSnapshot: food,
+      consumedGrams: 100,
+      calculatedNutrition: makeNutrition({ caloriesKcal: 100, proteinG: 10 }),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }],
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const data: AppDataSnapshot = {
+    fixedMealTemplates: [
+      baseTemplate,
+      {
+        ...baseTemplate,
+        id: 'inactive-template',
+        isActive: false,
+        weekdays: ['tue', 'thu'],
+      },
+      {
+        ...baseTemplate,
+        id: 'weekend-preset-template',
+        weekdays: ['sat', 'sun'],
+      },
+    ],
+    foods: [food],
+    hiddenFixedMealSourceKeys: {},
+    mealsByDate: {},
+    nutritionGoalType: 'maintain',
+    todayTargets: fallback.todayTargets,
+  };
+
+  const restored = restoreAppDataSnapshot(serializeAppDataSnapshot(data), fallback);
+  const deletedRestored = restoreAppDataSnapshot(
+    serializeAppDataSnapshot({
+      ...data,
+      fixedMealTemplates: data.fixedMealTemplates.filter((template) => template.id !== 'weekday-edit-template'),
+    }),
+    fallback,
+  );
+
+  assert.deepEqual(restored.fixedMealTemplates[0]?.weekdays, ['mon', 'wed']);
+  assert.equal(restored.fixedMealTemplates[1]?.isActive, false);
+  assert.deepEqual(restored.fixedMealTemplates[1]?.weekdays, ['tue', 'thu']);
+  assert.deepEqual(restored.fixedMealTemplates[2]?.weekdays, ['sat', 'sun']);
+  assert.deepEqual(
+    deletedRestored.fixedMealTemplates.map((template) => template.id),
+    ['inactive-template', 'weekend-preset-template'],
+  );
 });
