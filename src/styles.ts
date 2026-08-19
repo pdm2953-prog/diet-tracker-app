@@ -2718,7 +2718,7 @@ export const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.sm,
   },
   fixedMealManagerBody: {
-    gap: spacing.lg,
+    gap: spacing.md,
     paddingBottom: spacing.xl,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
@@ -2726,8 +2726,8 @@ export const styles = StyleSheet.create({
   fixedMealManagerScheduleRow: {
     borderBottomColor: colors.divider,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: spacing.md,
-    paddingBottom: spacing.lg,
+    gap: spacing.sm,
+    paddingBottom: spacing.md,
   },
   fixedMealManagerScheduleRowInactive: {
     opacity: 0.58,
@@ -2735,7 +2735,7 @@ export const styles = StyleSheet.create({
   fixedMealManagerScheduleHeader: {
     alignItems: 'flex-start',
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
     justifyContent: 'space-between',
   },
   fixedMealManagerScheduleTitleBlock: {
@@ -2745,9 +2745,9 @@ export const styles = StyleSheet.create({
   },
   fixedMealManagerFoodName: {
     color: colors.text,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    lineHeight: typography.lineHeight.lg,
+    fontSize: fontSize.base,
+    fontWeight: '800',
+    lineHeight: typography.lineHeight.base,
   },
   fixedMealManagerFoodMeta: {
     color: colors.textMuted,
@@ -2766,8 +2766,8 @@ export const styles = StyleSheet.create({
     borderRadius: radius.small,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 36,
-    minWidth: 52,
+    minHeight: 32,
+    minWidth: 50,
     paddingHorizontal: spacing.sm,
   },
   fixedMealManagerActiveSwitchOn: {
@@ -2918,4 +2918,80 @@ export const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '800',
     lineHeight: typography.lineHeight.md,
-  },});
+  },
+  fixedMealWeekdayEditor: {
+    gap: spacing.sm,
+  },
+  fixedMealWeekdayEditorLabel: {
+    color: colors.text,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    lineHeight: typography.lineHeight.sm,
+  },
+  fixedMealManagerActionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
+  fixedMealManagerEditBlock: {
+    gap: spacing.sm,
+  },
+  fixedMealManagerEditActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'flex-end',
+  },
+  fixedMealManagerEditButton: {
+    minHeight: 36,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  fixedMealScheduleSetupModal: {
+    alignSelf: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.large,
+    borderWidth: 1,
+    maxHeight: '86%',
+    maxWidth: 430,
+    overflow: 'hidden',
+    padding: spacing.lg,
+    width: '90%',
+    ...shadow.modal,
+  },
+  fixedMealScheduleSetupHeader: {
+    gap: spacing.xxs,
+    marginBottom: spacing.md,
+  },
+  fixedMealScheduleSetupTitle: {
+    color: colors.text,
+    fontSize: fontSize.xl,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: typography.lineHeight.xl,
+  },
+  fixedMealScheduleSetupFoodName: {
+    color: colors.text,
+    fontSize: fontSize.base,
+    fontWeight: '800',
+    lineHeight: typography.lineHeight.base,
+  },
+  fixedMealScheduleSetupMeta: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    lineHeight: typography.lineHeight.sm,
+  },
+  fixedMealScheduleSetupActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+    marginTop: spacing.lg,
+  },
+  fixedMealScheduleSetupButton: {
+    flex: 1,
+    minHeight: 40,
+  },
+});

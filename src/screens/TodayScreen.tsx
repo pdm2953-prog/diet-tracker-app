@@ -3,6 +3,8 @@ import type { Dispatch, SetStateAction } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { FixedMealManagerModal } from '../components/FixedMealManagerModal';
+import { FixedMealScheduleSetupModal } from '../components/FixedMealScheduleSetupModal';
+import type { FixedMealScheduleSetupState } from '../components/FixedMealScheduleSetupModal';
 import { FoodPortionModal } from '../components/FoodPortionModal';
 import type { FoodPortionModalState } from '../components/FoodPortionModal';
 import { FoodSearchPanel } from '../components/FoodSearchPanel';
@@ -10,6 +12,7 @@ import { MealSection } from '../components/MealSection';
 import { NutritionSummaryPanel } from '../components/NutritionSummaryPanel';
 import { GRAM_ADJUST_STEP } from '../constants';
 import { isFixedMealFood } from '../fixedMeals';
+import { allFixedMealWeekdays } from '../fixedMealRecurrence';
 import {
   addFoodToMeals,
   hasValidGramServing,
@@ -62,14 +65,18 @@ type TodayScreenProps = {
   fixedMealTemplates: FixedMealTemplate[];
   foods: Food[];
   onCreateFixedMealTemplate: (mealType: MealType, mealFood: MealFood, food: Food) => void;
-  onCreateFixedMealTemplateFromFood: (mealType: MealType, food: Food, consumedGrams: number) => void;
+  onCreateFixedMealTemplateFromFood: (
+    mealType: MealType,
+    food: Food,
+    consumedGrams: number,
+    weekdays: readonly FixedMealWeekday[],
+  ) => void;
   onFoodsChange: Dispatch<SetStateAction<Food[]>>;
   onHideFixedMealSourceKey: (date: string, sourceKey: string) => void;
   onRemoveFixedMealTemplate: (templateId: string) => void;
   onSelectedDateChange: (date: string) => void;
   onSetFixedMealTemplateActive: (templateId: string, isActive: boolean) => void;
   onSetFixedMealTemplateWeekdays: (templateId: string, weekdays: readonly FixedMealWeekday[]) => void;
-  onToggleFixedMealTemplateWeekday: (templateId: string, weekday: FixedMealWeekday) => void;
   onUpdateSelectedDateMeals: (
     updatedAt: string,
     updateMeals: (currentMeals: Meal[]) => Meal[],
@@ -96,7 +103,6 @@ export function TodayScreen({
   onSelectedDateChange,
   onSetFixedMealTemplateActive,
   onSetFixedMealTemplateWeekdays,
-  onToggleFixedMealTemplateWeekday,
   onUpdateSelectedDateMeals,
   selectedDate,
   selectedMeals,
@@ -113,6 +119,8 @@ export function TodayScreen({
   const [activeSearchMode, setActiveSearchMode] = useState<FoodSearchMode>('meal');
   const [fixedMealManagerMealType, setFixedMealManagerMealType] = useState<MealType | null>(null);
   const [portionModal, setPortionModal] = useState<FoodPortionModalState | null>(null);
+  const [fixedMealScheduleSetup, setFixedMealScheduleSetup] =
+    useState<FixedMealScheduleSetupState | null>(null);
   const [portionGramsInput, setPortionGramsInput] = useState('');
   const foodSearchRequestGate = useRef(createFoodSearchRequestGate()).current;
   const foodsById = useMemo<Record<string, Food>>(
@@ -172,6 +180,7 @@ export function TodayScreen({
 
   const openFoodSearch = (mealType: MealType) => {
     setFixedMealManagerMealType(null);
+    setFixedMealScheduleSetup(null);
     setActiveSearchMode('meal');
     setActiveSearchMealType(mealType);
     resetFoodSearchState();
@@ -179,6 +188,7 @@ export function TodayScreen({
 
   const openFixedMealSearch = (mealType: MealType) => {
     setFixedMealManagerMealType(null);
+    setFixedMealScheduleSetup(null);
     setActiveSearchMode('fixedMeal');
     setActiveSearchMealType(mealType);
     resetFoodSearchState();
@@ -199,10 +209,41 @@ export function TodayScreen({
     setPortionGramsInput('');
   };
 
+  const cancelFixedMealScheduleSetup = () => {
+    const mealType = fixedMealScheduleSetup?.mealType ?? null;
+
+    setFixedMealScheduleSetup(null);
+
+    if (mealType !== null) {
+      setFixedMealManagerMealType(mealType);
+    }
+  };
+
+  const changeFixedMealScheduleWeekdays = (weekdays: FixedMealWeekday[]) => {
+    setFixedMealScheduleSetup((currentSetup) =>
+      currentSetup === null
+        ? currentSetup
+        : { ...currentSetup, weekdays },
+    );
+  };
+
+  const confirmFixedMealScheduleSetup = () => {
+    if (fixedMealScheduleSetup === null || fixedMealScheduleSetup.weekdays.length === 0) {
+      return;
+    }
+
+    const { consumedGrams, food, mealType, weekdays } = fixedMealScheduleSetup;
+
+    onCreateFixedMealTemplateFromFood(mealType, food, consumedGrams, weekdays);
+    setFixedMealScheduleSetup(null);
+    setFixedMealManagerMealType(mealType);
+  };
+
   const changeSelectedDate = (dayDelta: number) => {
     closeFoodSearch();
     closeFixedMealManagement();
     closePortionModal();
+    setFixedMealScheduleSetup(null);
     onSelectedDateChange(shiftLocalDateString(selectedDate, dayDelta));
   };
 
@@ -210,12 +251,14 @@ export function TodayScreen({
     closeFoodSearch();
     closeFixedMealManagement();
     closePortionModal();
+    setFixedMealScheduleSetup(null);
     onSelectedDateChange(getLocalDateString());
   };
 
   const openFixedMealManagement = (mealType: MealType) => {
     closeFoodSearch();
     closePortionModal();
+    setFixedMealScheduleSetup(null);
     setFixedMealManagerMealType(mealType);
   };
 
@@ -311,10 +354,14 @@ export function TodayScreen({
     if (activeSearchMode === 'fixedMeal') {
       const mealType = portionModal.mealType;
 
-      onCreateFixedMealTemplateFromFood(mealType, portionModal.food, consumedGrams);
+      setFixedMealScheduleSetup({
+        consumedGrams: normalizeConsumedGrams(consumedGrams),
+        food: portionModal.food,
+        mealType,
+        weekdays: [...allFixedMealWeekdays],
+      });
       closePortionModal();
       closeFoodSearch();
-      setFixedMealManagerMealType(mealType);
       return;
     }
 
@@ -423,7 +470,9 @@ export function TodayScreen({
   };
 
   const selectedDateIsToday = selectedDate === currentToday;
-  const foodSearchIsVisible = portionModal === null && fixedMealManagerMealType === null;
+  const foodSearchIsVisible = portionModal === null
+    && fixedMealManagerMealType === null
+    && fixedMealScheduleSetup === null;
   const isFixedMealSearch = activeSearchMode === 'fixedMeal';
 
   return (
@@ -536,15 +585,21 @@ export function TodayScreen({
         onRemoveTemplate={onRemoveFixedMealTemplate}
         onSetTemplateActive={onSetFixedMealTemplateActive}
         onSetTemplateWeekdays={onSetFixedMealTemplateWeekdays}
-        onToggleTemplateWeekday={onToggleFixedMealTemplateWeekday}
         templates={fixedMealTemplates}
       />
 
+      <FixedMealScheduleSetupModal
+        onCancel={cancelFixedMealScheduleSetup}
+        onChangeWeekdays={changeFixedMealScheduleWeekdays}
+        onConfirm={confirmFixedMealScheduleSetup}
+        state={fixedMealScheduleSetup}
+      />
+
       <FoodPortionModal
-        confirmAccessibilityLabel={isFixedMealSearch ? '고정 식단 저장' : undefined}
-        confirmLabel={isFixedMealSearch ? '고정 식단 저장' : undefined}
+        confirmAccessibilityLabel={isFixedMealSearch ? '반복 요일 설정' : undefined}
+        confirmLabel={isFixedMealSearch ? '다음' : undefined}
         gramsInput={portionGramsInput}
-        helpText={isFixedMealSearch ? '입력한 g수와 매일 반복을 기본값으로 고정 식단에 저장합니다.' : undefined}
+        helpText={isFixedMealSearch ? '입력한 g수 기준으로 반복 요일을 선택합니다.' : undefined}
         onChangeGramsInput={setPortionGramsInput}
         onClose={closePortionModal}
         onConfirm={confirmPortionModal}

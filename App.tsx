@@ -14,7 +14,6 @@ import {
   removeFixedMealTemplateById,
   setFixedMealTemplateActive,
   setFixedMealTemplateWeekdays,
-  toggleFixedMealTemplateWeekday,
 } from './src/fixedMeals';
 import { shouldPersistAppDataSnapshot, shouldRenderInteractiveApp } from './src/appHydration';
 import { getMealsForDate, hasValidGramServing, normalizeConsumedGrams } from './src/meals';
@@ -246,6 +245,7 @@ export default function App() {
     mealType: MealType,
     food: Food,
     consumedGrams: number,
+    weekdays: readonly FixedMealWeekday[],
   ) => {
     const normalizedConsumedGrams = normalizeConsumedGrams(consumedGrams);
 
@@ -271,6 +271,7 @@ export default function App() {
     const { templateId, templateItemId } = createPromotedFixedMealTemplateIds(
       mealType,
       mealFood,
+      weekdays,
     );
 
     setFoods((currentFoods) =>
@@ -288,6 +289,7 @@ export default function App() {
         templateId,
         templateItemId,
         timestamp,
+        weekdays,
       }).fixedMealTemplates,
     );
   };
@@ -311,16 +313,6 @@ export default function App() {
     );
   };
 
-  const toggleFixedMealTemplateWeekdayState = (
-    templateId: string,
-    weekday: FixedMealWeekday,
-  ) => {
-    const updatedAt = new Date().toISOString();
-
-    setFixedMealTemplates((currentTemplates) =>
-      toggleFixedMealTemplateWeekday(currentTemplates, templateId, weekday, updatedAt),
-    );
-  };
 
   const removeFixedMealTemplate = (templateId: string) => {
     setFixedMealTemplates((currentTemplates) =>
@@ -368,7 +360,6 @@ export default function App() {
             onRemoveFixedMealTemplate={removeFixedMealTemplate}
             onSetFixedMealTemplateActive={setFixedMealTemplateActiveState}
             onSetFixedMealTemplateWeekdays={setFixedMealTemplateWeekdaysState}
-            onToggleFixedMealTemplateWeekday={toggleFixedMealTemplateWeekdayState}
             onSelectedDateChange={setSelectedDate}
             onUpdateSelectedDateMeals={updateSelectedDateMeals}
             selectedDate={selectedDate}

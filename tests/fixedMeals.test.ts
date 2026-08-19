@@ -14,6 +14,7 @@ import {
 import {
   allFixedMealWeekdays,
   fixedMealWeekdayPresets,
+  formatFixedMealWeekdays,
   getFixedMealWeekdayForDate,
 } from '../src/fixedMealRecurrence';
 import { createEmptyMealsForDate } from '../src/meals';
@@ -261,6 +262,13 @@ test('promoted fixed meal templates default to every weekday and encode non-dail
   assert.equal(weekdayIds.templateId === dailyIds.templateId, false);
 });
 
+
+test('fixed meal recurrence summaries use compact Korean presentation labels', () => {
+  assert.equal(formatFixedMealWeekdays(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']), '매일');
+  assert.equal(formatFixedMealWeekdays(['mon', 'tue', 'wed', 'thu', 'fri']), '평일');
+  assert.equal(formatFixedMealWeekdays(['sat', 'sun']), '주말');
+  assert.equal(formatFixedMealWeekdays(['mon', 'wed']), '월 · 수');
+});
 test('fixed meal recurrence applies only on selected local weekdays', () => {
   const tomato = makeFood('food-tomato');
   const banana = makeFood('food-banana-weekday');
@@ -330,6 +338,7 @@ test('weekday editing persists at least one selected day and repeated reconcilia
   const food = makeFood();
   const promotion = promoteDirectMealFood({ food, mealFood: makeMealFood({ food }) });
   const templateId = promotion.fixedMealTemplates[0].id;
+  const templateItemId = promotion.fixedMealTemplates[0].items[0].id;
   const saturdayOnlyTemplates = setFixedMealTemplateWeekdays(
     promotion.fixedMealTemplates,
     templateId,
@@ -363,6 +372,8 @@ test('weekday editing persists at least one selected day and repeated reconcilia
     timestamp,
   });
 
+  assert.equal(saturdayOnlyTemplates[0].id, templateId);
+  assert.equal(saturdayOnlyTemplates[0].items[0].id, templateItemId);
   assert.deepEqual(saturdayOnlyTemplates[0].weekdays, ['sat']);
   assert.equal(unchangedTemplates, saturdayOnlyTemplates);
   assert.deepEqual(stillSaturdayTemplates[0].weekdays, ['sat']);

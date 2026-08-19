@@ -3,9 +3,6 @@ import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { mealLabels } from '../constants';
 import {
-  fixedMealWeekdayLabels,
-  fixedMealWeekdayPresets,
-  fixedMealWeekdays,
   formatFixedMealWeekdays,
   normalizeFixedMealWeekdays,
 } from '../fixedMealRecurrence';
@@ -14,6 +11,7 @@ import { formatNutritionValue } from '../nutrition';
 import { styles } from '../styles';
 import { formatAmountLabel } from '../utils/format';
 import { getFoodDisplayName } from '../utils/foodDisplay';
+import { FixedMealWeekdaySelector } from './FixedMealWeekdaySelector';
 import { PrimaryButton, SecondaryButton } from './ui';
 
 type FixedMealManagerModalProps = {
@@ -24,7 +22,6 @@ type FixedMealManagerModalProps = {
   onRemoveTemplate: (templateId: string) => void;
   onSetTemplateActive: (templateId: string, isActive: boolean) => void;
   onSetTemplateWeekdays: (templateId: string, weekdays: readonly FixedMealWeekday[]) => void;
-  onToggleTemplateWeekday: (templateId: string, weekday: FixedMealWeekday) => void;
   templates: FixedMealTemplate[];
 };
 
@@ -36,10 +33,11 @@ export function FixedMealManagerModal({
   onRemoveTemplate,
   onSetTemplateActive,
   onSetTemplateWeekdays,
-  onToggleTemplateWeekday,
   templates,
 }: FixedMealManagerModalProps) {
   const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [editingWeekdays, setEditingWeekdays] = useState<FixedMealWeekday[]>([]);
   const scopedTemplates = useMemo(
     () => templates.filter((template) => template.mealType === mealType),
     [mealType, templates],
@@ -50,13 +48,39 @@ export function FixedMealManagerModal({
   }
 
   const mealLabel = mealLabels[mealType];
+  const closeTemplateEdit = () => {
+    setEditingTemplateId(null);
+    setEditingWeekdays([]);
+  };
   const closeModal = () => {
     setPendingDeleteTemplateId(null);
+    closeTemplateEdit();
     onClose();
+  };
+  const startTemplateEdit = (template: FixedMealTemplate) => {
+    setPendingDeleteTemplateId(null);
+    setEditingTemplateId(template.id);
+    setEditingWeekdays(normalizeFixedMealWeekdays(template.weekdays));
+  };
+  const saveTemplateEdit = () => {
+    if (editingTemplateId === null || editingWeekdays.length === 0) {
+      return;
+    }
+
+    onSetTemplateWeekdays(editingTemplateId, editingWeekdays);
+    closeTemplateEdit();
+  };
+  const requestTemplateDelete = (templateId: string) => {
+    closeTemplateEdit();
+    setPendingDeleteTemplateId(templateId);
   };
   const removeTemplate = (templateId: string) => {
     onRemoveTemplate(templateId);
     setPendingDeleteTemplateId(null);
+
+    if (editingTemplateId === templateId) {
+      closeTemplateEdit();
+    }
   };
 
   return (
@@ -85,7 +109,7 @@ export function FixedMealManagerModal({
           <View style={styles.fixedMealManagerHeader}>
             <View style={styles.fixedMealManagerTitleBlock}>
               <Text style={styles.fixedMealManagerTitle}>{mealLabel} 고정 식단</Text>
-              <Text style={styles.fixedMealManagerSubtitle}>요일별로 자동 추가됩니다.</Text>
+              <Text style={styles.fixedMealManagerSubtitle}>등록된 식단과 반복 요일을 확인합니다.</Text>
             </View>
             <Pressable
               accessibilityLabel={`${mealLabel} 고정 식단 닫기`}
@@ -108,14 +132,18 @@ export function FixedMealManagerModal({
             {scopedTemplates.length > 0 ? (
               scopedTemplates.map((template) => (
                 <FixedMealScheduleRow
+                  editingWeekdays={editingTemplateId === template.id ? editingWeekdays : normalizeFixedMealWeekdays(template.weekdays)}
                   foodsById={foodsById}
+                  isEditing={editingTemplateId === template.id}
                   key={template.id}
                   onCancelDelete={() => setPendingDeleteTemplateId(null)}
+                  onCancelEdit={closeTemplateEdit}
+                  onChangeEditingWeekdays={setEditingWeekdays}
                   onConfirmDelete={removeTemplate}
-                  onRequestDelete={setPendingDeleteTemplateId}
+                  onRequestDelete={requestTemplateDelete}
+                  onRequestEdit={startTemplateEdit}
+                  onSaveEdit={saveTemplateEdit}
                   onSetActive={onSetTemplateActive}
-                  onSetWeekdays={onSetTemplateWeekdays}
-                  onToggleWeekday={onToggleTemplateWeekday}
                   pendingDelete={pendingDeleteTemplateId === template.id}
                   template={template}
                 />
@@ -150,25 +178,33 @@ export function FixedMealManagerModal({
 }
 
 type FixedMealScheduleRowProps = {
+  editingWeekdays: readonly FixedMealWeekday[];
   foodsById: Record<string, Food>;
+  isEditing: boolean;
   onCancelDelete: () => void;
+  onCancelEdit: () => void;
+  onChangeEditingWeekdays: (weekdays: FixedMealWeekday[]) => void;
   onConfirmDelete: (templateId: string) => void;
   onRequestDelete: (templateId: string) => void;
+  onRequestEdit: (template: FixedMealTemplate) => void;
+  onSaveEdit: () => void;
   onSetActive: (templateId: string, isActive: boolean) => void;
-  onSetWeekdays: (templateId: string, weekdays: readonly FixedMealWeekday[]) => void;
-  onToggleWeekday: (templateId: string, weekday: FixedMealWeekday) => void;
   pendingDelete: boolean;
   template: FixedMealTemplate;
 };
 
 function FixedMealScheduleRow({
+  editingWeekdays,
   foodsById,
+  isEditing,
   onCancelDelete,
+  onCancelEdit,
+  onChangeEditingWeekdays,
   onConfirmDelete,
   onRequestDelete,
+  onRequestEdit,
+  onSaveEdit,
   onSetActive,
-  onSetWeekdays,
-  onToggleWeekday,
   pendingDelete,
   template,
 }: FixedMealScheduleRowProps) {
@@ -181,6 +217,7 @@ function FixedMealScheduleRow({
   const itemMeta = primaryItem === undefined
     ? `${template.items.length}개 음식`
     : `${formatAmountLabel(primaryItem.consumedGrams)}g · ${formatNutritionValue('caloriesKcal', primaryItem.calculatedNutrition.caloriesKcal)}`;
+  const recurrenceSummary = formatFixedMealWeekdays(weekdays);
 
   return (
     <View
@@ -192,10 +229,10 @@ function FixedMealScheduleRow({
     >
       <View style={styles.fixedMealManagerScheduleHeader}>
         <View style={styles.fixedMealManagerScheduleTitleBlock}>
-          <Text style={styles.fixedMealManagerFoodName}>{title}</Text>
-          <Text style={styles.fixedMealManagerFoodMeta}>{itemMeta}</Text>
-          <Text style={styles.fixedMealManagerScheduleMeta}>
-            {formatFixedMealWeekdays(weekdays)} · {template.isActive ? '활성' : '비활성'}
+          <Text numberOfLines={1} style={styles.fixedMealManagerFoodName}>{title}</Text>
+          <Text numberOfLines={1} style={styles.fixedMealManagerFoodMeta}>{itemMeta}</Text>
+          <Text numberOfLines={1} style={styles.fixedMealManagerScheduleMeta}>
+            {recurrenceSummary} · {template.isActive ? '활성' : '비활성'}
           </Text>
         </View>
         <Pressable
@@ -221,75 +258,47 @@ function FixedMealScheduleRow({
         </Pressable>
       </View>
 
-      <View style={styles.fixedMealPresetRow}>
-        {fixedMealWeekdayPresets.map((preset) => (
-          <Pressable
-            accessibilityLabel={`${title} ${preset.label} 반복 설정`}
-            accessibilityRole="button"
-            key={preset.key}
-            onPress={() => onSetWeekdays(template.id, preset.weekdays)}
-            style={({ pressed }) => [
-              styles.fixedMealPresetButton,
-              isSameWeekdaySelection(weekdays, preset.weekdays) ? styles.fixedMealPresetButtonSelected : null,
-              pressed ? styles.addFoodCompactButtonPressed : null,
-            ]}
-            testID={`fixed-meal-preset-${template.id}-${preset.key}`}
-          >
-            <Text
-              style={[
-                styles.fixedMealPresetButtonText,
-                isSameWeekdaySelection(weekdays, preset.weekdays) ? styles.fixedMealPresetButtonTextSelected : null,
-              ]}
-            >
-              {preset.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <View style={styles.fixedMealWeekdayRow}>
-        {fixedMealWeekdays.map((weekday) => {
-          const selected = weekdays.includes(weekday);
-          const disabled = selected && weekdays.length === 1;
-
-          return (
-            <Pressable
-              accessibilityLabel={`${title} ${fixedMealWeekdayLabels[weekday]}요일 반복 ${selected ? '선택됨' : '미선택'}`}
-              accessibilityRole="button"
-              accessibilityState={{ disabled, selected }}
-              disabled={disabled}
-              key={weekday}
-              onPress={() => onToggleWeekday(template.id, weekday)}
-              style={({ pressed }) => [
-                styles.fixedMealWeekdayChip,
-                selected ? styles.fixedMealWeekdayChipSelected : null,
-                disabled ? styles.fixedMealWeekdayChipDisabled : null,
-                pressed && !disabled ? styles.addFoodCompactButtonPressed : null,
-              ]}
-              testID={`fixed-meal-weekday-${template.id}-${weekday}`}
-            >
-              <Text
-                style={[
-                  styles.fixedMealWeekdayChipText,
-                  selected ? styles.fixedMealWeekdayChipTextSelected : null,
-                ]}
-              >
-                {fixedMealWeekdayLabels[weekday]}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={styles.fixedMealManagerDeleteRow}>
-        <SecondaryButton
-          accessibilityLabel={`${title} 삭제 확인 열기`}
-          label="삭제"
-          onPress={() => onRequestDelete(template.id)}
-          style={styles.fixedMealManagerDeleteButton}
-          textStyle={styles.fixedMealManagerDeleteButtonText}
-        />
-      </View>
+      {isEditing ? (
+        <View style={styles.fixedMealManagerEditBlock} testID={`fixed-meal-editor-${template.id}`}>
+          <FixedMealWeekdaySelector
+            onChangeWeekdays={onChangeEditingWeekdays}
+            testIDPrefix={template.id}
+            title={title}
+            weekdays={editingWeekdays}
+          />
+          <View style={styles.fixedMealManagerEditActions}>
+            <SecondaryButton
+              accessibilityLabel={`${title} 요일 수정 취소`}
+              label="취소"
+              onPress={onCancelEdit}
+              style={styles.fixedMealManagerEditButton}
+            />
+            <PrimaryButton
+              accessibilityLabel={`${title} 요일 저장`}
+              disabled={editingWeekdays.length === 0}
+              label="저장"
+              onPress={onSaveEdit}
+              style={styles.fixedMealManagerEditButton}
+            />
+          </View>
+        </View>
+      ) : (
+        <View style={styles.fixedMealManagerActionRow}>
+          <SecondaryButton
+            accessibilityLabel={`${title} 요일 수정`}
+            label="수정"
+            onPress={() => onRequestEdit(template)}
+            style={styles.fixedMealManagerEditButton}
+          />
+          <SecondaryButton
+            accessibilityLabel={`${title} 삭제 확인 열기`}
+            label="삭제"
+            onPress={() => onRequestDelete(template.id)}
+            style={styles.fixedMealManagerDeleteButton}
+            textStyle={styles.fixedMealManagerDeleteButtonText}
+          />
+        </View>
+      )}
 
       {pendingDelete ? (
         <View style={styles.fixedMealManagerConfirmBox}>
@@ -315,15 +324,4 @@ function FixedMealScheduleRow({
       ) : null}
     </View>
   );
-}
-
-function isSameWeekdaySelection(
-  firstWeekdays: readonly FixedMealWeekday[],
-  secondWeekdays: readonly FixedMealWeekday[],
-): boolean {
-  const firstNormalized = normalizeFixedMealWeekdays(firstWeekdays);
-  const secondNormalized = normalizeFixedMealWeekdays(secondWeekdays);
-
-  return firstNormalized.length === secondNormalized.length
-    && firstNormalized.every((weekday, index) => weekday === secondNormalized[index]);
 }

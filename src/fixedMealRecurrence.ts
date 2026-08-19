@@ -114,7 +114,5 @@ export function formatFixedMealWeekdays(
 
   return normalizedWeekdays
     .map((weekday) => fixedMealWeekdayLabels[weekday])
-    .join('/');
+    .join(' · ');
 }
-
-
