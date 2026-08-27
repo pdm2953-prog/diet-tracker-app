@@ -15,6 +15,12 @@ import {
   setFixedMealTemplateActive,
   setFixedMealTemplateWeekdays,
 } from './src/fixedMeals';
+import {
+  createNutritionGoalHistoryEntry,
+  resolveNutritionGoalForDate,
+  upsertNutritionGoalHistoryEntry,
+} from './src/goalHistory';
+import type { NutritionGoalHistoryEntry } from './src/goalHistory';
 import { shouldPersistAppDataSnapshot, shouldRenderInteractiveApp } from './src/appHydration';
 import { getMealsForDate, hasValidGramServing, normalizeConsumedGrams } from './src/meals';
 import { bottomTabs, getGoalSetupScreenKey } from './src/navigation';
@@ -50,6 +56,7 @@ import { getLocalDateString } from './src/utils/format';
 type InitialAppState = {
   fixedMealTemplates: FixedMealTemplate[];
   foods: Food[];
+  goalHistory: NutritionGoalHistoryEntry[];
   hiddenFixedMealSourceKeys: HiddenFixedMealSourceKeysByDate;
   mealsByDate: MealsByDate;
   nutritionGoalType: NutritionGoalType;
@@ -72,6 +79,7 @@ function createInitialAppState(): InitialAppState {
     selectedDate,
     fixedMealTemplates: fallbackData.fixedMealTemplates,
     foods: fallbackData.foods,
+    goalHistory: fallbackData.goalHistory,
     hiddenFixedMealSourceKeys: fallbackData.hiddenFixedMealSourceKeys,
     mealsByDate: fallbackData.mealsByDate,
     nutritionGoalType: fallbackData.nutritionGoalType,
@@ -106,13 +114,19 @@ export default function App() {
   );
   const [hiddenFixedMealSourceKeys, setHiddenFixedMealSourceKeys] =
     useState<HiddenFixedMealSourceKeysByDate>(initialAppState.hiddenFixedMealSourceKeys);
-  const [todayTargets, setTodayTargets] = useState<DailyNutritionTargets>(
-    initialAppState.todayTargets,
-  );
-  const [nutritionGoalType, setNutritionGoalType] = useState<NutritionGoalType>(
-    initialAppState.nutritionGoalType,
+  const [goalHistory, setGoalHistory] = useState<NutritionGoalHistoryEntry[]>(
+    initialAppState.goalHistory,
   );
   const [storageLoaded, setStorageLoaded] = useState(false);
+  const todayDate = getLocalDateString();
+  const todayGoal = useMemo(
+    () => resolveNutritionGoalForDate(goalHistory, todayDate),
+    [goalHistory, todayDate],
+  );
+  const selectedDateGoal = useMemo(
+    () => resolveNutritionGoalForDate(goalHistory, selectedDate),
+    [goalHistory, selectedDate],
+  );
   const visibleFoods = useMemo(
     () => mergeFoodsById(foods, fixedMealTemplates),
     [fixedMealTemplates, foods],
@@ -143,6 +157,7 @@ export default function App() {
     const fallbackData = {
       fixedMealTemplates: initialAppState.fixedMealTemplates,
       foods: initialAppState.foods,
+      goalHistory: initialAppState.goalHistory,
       hiddenFixedMealSourceKeys: initialAppState.hiddenFixedMealSourceKeys,
       mealsByDate: initialAppState.mealsByDate,
       nutritionGoalType: initialAppState.nutritionGoalType,
@@ -156,10 +171,9 @@ export default function App() {
 
       setFixedMealTemplates(restoredData.fixedMealTemplates);
       setFoods(restoredData.foods);
+      setGoalHistory(restoredData.goalHistory);
       setHiddenFixedMealSourceKeys(restoredData.hiddenFixedMealSourceKeys);
       setMealsByDate(restoredData.mealsByDate);
-      setNutritionGoalType(restoredData.nutritionGoalType);
-      setTodayTargets(restoredData.todayTargets);
       setStorageLoaded(true);
     });
 
@@ -176,12 +190,13 @@ export default function App() {
     void saveAppDataSnapshot({
       fixedMealTemplates,
       foods,
+      goalHistory,
       hiddenFixedMealSourceKeys,
       mealsByDate,
-      nutritionGoalType,
-      todayTargets,
+      nutritionGoalType: todayGoal.goalType,
+      todayTargets: todayGoal.targets,
     });
-  }, [fixedMealTemplates, foods, hiddenFixedMealSourceKeys, mealsByDate, nutritionGoalType, storageLoaded, todayTargets]);
+  }, [fixedMealTemplates, foods, goalHistory, hiddenFixedMealSourceKeys, mealsByDate, storageLoaded, todayGoal]);
 
   const updateSelectedDateMeals = (
     updatedAt: string,
@@ -329,8 +344,12 @@ export default function App() {
     targets: DailyNutritionTargets,
     goalType: NutritionGoalType,
   ) => {
-    setTodayTargets(targets);
-    setNutritionGoalType(goalType);
+    setGoalHistory((currentGoalHistory) =>
+      upsertNutritionGoalHistoryEntry(
+        currentGoalHistory,
+        createNutritionGoalHistoryEntry(getLocalDateString(), goalType, targets),
+      ),
+    );
   };
 
   if (!shouldRenderInteractiveApp(storageLoaded)) {
@@ -364,7 +383,7 @@ export default function App() {
             onUpdateSelectedDateMeals={updateSelectedDateMeals}
             selectedDate={selectedDate}
             selectedMeals={selectedMeals}
-            targets={todayTargets}
+            targets={selectedDateGoal.targets}
           />
         </View>
         <View style={[screenPaneStyle, activeTab !== 'calendar' ? hiddenScreenPaneStyle : null]}>
@@ -377,21 +396,21 @@ export default function App() {
             onOpenToday={() => setActiveTab('today')}
             onSelectedDateChange={setSelectedDate}
             selectedDate={selectedDate}
-            targets={todayTargets}
+            goalHistory={goalHistory}
           />
         </View>
         <View style={[screenPaneStyle, activeTab !== 'target' ? hiddenScreenPaneStyle : null]}>
           <TargetScreen
-            currentGoalType={nutritionGoalType}
-            currentTargets={todayTargets}
+            currentGoalType={todayGoal.goalType}
+            currentTargets={todayGoal.targets}
             onTargetsChange={applyTargetsFromGoalSetup}
           />
         </View>
         <View style={[screenPaneStyle, activeTab !== 'settings' ? hiddenScreenPaneStyle : null]}>
           <SettingsScreen
-            nutritionGoalType={nutritionGoalType}
+            nutritionGoalType={todayGoal.goalType}
             onOpenGoalSetup={() => setActiveTab(getGoalSetupScreenKey())}
-            targets={todayTargets}
+            targets={todayGoal.targets}
           />
         </View>
       </View>

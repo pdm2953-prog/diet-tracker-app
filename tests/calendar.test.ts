@@ -6,6 +6,10 @@ import {
   countGroupedMealFoods,
 } from '../src/calendar';
 import {
+  createBaselineNutritionGoalHistory,
+  createNutritionGoalHistoryEntry,
+} from '../src/goalHistory';
+import {
   applyFixedMealTemplatesToMeals,
   createFixedMealSourceKey,
   hideFixedMealSourceKeyForDate,
@@ -36,6 +40,7 @@ const targets: DailyNutritionTargets = {
   carbohydrateG: 250,
   fatG: 60,
 };
+const defaultGoalHistory = createBaselineNutritionGoalHistory(targets, 'maintain');
 
 function makeNutrition(overrides: Partial<Nutrition> = {}): Nutrition {
   return {
@@ -145,16 +150,18 @@ function makeFixedTemplate({
 function buildDetails({
   date = todayDate,
   fixedMealTemplates = [],
+  goalHistory = defaultGoalHistory,
   hiddenFixedMealSourceKeys = {},
   mealsByDate = {},
+  todayDate: evaluationTodayDate = todayDate,
 }: Partial<Parameters<typeof buildCalendarDayDetails>[0]> = {}) {
   return buildCalendarDayDetails({
     date,
     fixedMealTemplates,
+    goalHistory,
     hiddenFixedMealSourceKeys,
     mealsByDate,
-    targets,
-    todayDate,
+    todayDate: evaluationTodayDate,
   });
 }
 
@@ -270,6 +277,52 @@ test('calendar details separate fixed meals from user-added meals by meal slot',
   assert.equal(countGroupedMealFoods(details.directMealFoodsByType), 1);
 });
 
+test('past calendar evaluations use the goal snapshot effective on that date', () => {
+  const pastDate = '2026-07-20';
+  const currentTargets: DailyNutritionTargets = {
+    caloriesKcal: 1000,
+    proteinG: 50,
+    carbohydrateG: 120,
+    fatG: 30,
+  };
+  const historicalGoalHistory = [
+    ...createBaselineNutritionGoalHistory(targets, 'maintain'),
+    createNutritionGoalHistoryEntry(todayDate, 'diet', currentTargets),
+  ];
+  const nutrition = makeNutrition({
+    caloriesKcal: 2000,
+    proteinG: 100,
+    carbohydrateG: 250,
+    fatG: 60,
+  });
+  const pastDetails = buildDetails({
+    date: pastDate,
+    goalHistory: historicalGoalHistory,
+    mealsByDate: {
+      [pastDate]: makeMeals(pastDate, 'breakfast', [makeMealFood({
+        checked: true,
+        id: 'past-goal-food',
+        nutrition,
+      })]),
+    },
+  });
+  const todayDetails = buildDetails({
+    goalHistory: historicalGoalHistory,
+    mealsByDate: {
+      [todayDate]: makeMeals(todayDate, 'breakfast', [makeMealFood({
+        checked: true,
+        id: 'today-goal-food',
+        nutrition,
+      })]),
+    },
+  });
+
+  assert.equal(pastDetails.status, 'excellent');
+  assert.deepEqual(pastDetails.targets, targets);
+  assert.equal(todayDetails.status, 'high');
+  assert.deepEqual(todayDetails.targets, currentTargets);
+});
+
 test('fixed template application preserves the parent meal id for existing meals', () => {
   const template = makeFixedTemplate();
   const customMealId = 'meal-breakfast';
@@ -351,4 +404,60 @@ test('past fixed meal snapshots are preserved when templates change', () => {
   assert.equal(details.summary.totalCount, 1);
   assert.equal(details.summary.checkedNutritionTotal.caloriesKcal, 500);
   assert.equal(details.fixedMealFoodsByType.breakfast[0].id, 'past-fixed-snapshot');
+});
+
+test('calendar evaluation uses different old and new target snapshots across the change date', () => {
+  const oldDate = '2026-08-18';
+  const newDate = '2026-08-19';
+  const oldTargets: DailyNutritionTargets = {
+    caloriesKcal: 2000,
+    proteinG: 100,
+    carbohydrateG: 250,
+    fatG: 60,
+  };
+  const newTargets: DailyNutritionTargets = {
+    caloriesKcal: 1000,
+    proteinG: 50,
+    carbohydrateG: 120,
+    fatG: 30,
+  };
+  const historicalGoalHistory = [
+    createNutritionGoalHistoryEntry('2026-08-01', 'maintain', oldTargets),
+    createNutritionGoalHistoryEntry(newDate, 'diet', newTargets),
+  ];
+  const nutrition = makeNutrition({
+    caloriesKcal: 2000,
+    proteinG: 100,
+    carbohydrateG: 250,
+    fatG: 60,
+  });
+  const oldDateDetails = buildDetails({
+    date: oldDate,
+    goalHistory: historicalGoalHistory,
+    mealsByDate: {
+      [oldDate]: makeMeals(oldDate, 'breakfast', [makeMealFood({
+        checked: true,
+        id: 'old-target-food',
+        nutrition,
+      })]),
+    },
+    todayDate: newDate,
+  });
+  const newDateDetails = buildDetails({
+    date: newDate,
+    goalHistory: historicalGoalHistory,
+    mealsByDate: {
+      [newDate]: makeMeals(newDate, 'breakfast', [makeMealFood({
+        checked: true,
+        id: 'new-target-food',
+        nutrition,
+      })]),
+    },
+    todayDate: newDate,
+  });
+
+  assert.equal(oldDateDetails.status, 'excellent');
+  assert.deepEqual(oldDateDetails.targets, oldTargets);
+  assert.equal(newDateDetails.status, 'high');
+  assert.deepEqual(newDateDetails.targets, newTargets);
 });

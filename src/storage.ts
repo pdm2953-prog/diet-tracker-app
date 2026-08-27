@@ -8,17 +8,26 @@ import type {
   Nutrition,
 } from './models';
 import { normalizeFixedMealWeekdays } from './fixedMealRecurrence';
+import {
+  GOAL_HISTORY_BASELINE_DATE,
+  createBaselineNutritionGoalHistory,
+  createNutritionGoalHistoryEntry,
+  normalizeNutritionGoalHistory,
+  resolveNutritionGoalForDate,
+} from './goalHistory';
+import type { NutritionGoalHistoryEntry } from './goalHistory';
 import { DEFAULT_NUTRITION_GOAL_TYPE, isNutritionGoalType } from './goalPresentation';
 import { mealTypes } from './meals';
 import { dailyTargets } from './nutrition';
 import type { DailyNutritionTargets } from './nutrition';
 import type { NutritionGoalType } from './nutritionGoals';
-import { isValidLocalDateString } from './utils/date';
+import { getLocalDateString, isValidLocalDateString } from './utils/date';
 import { parseOptionalFoodDataSource } from './utils/foodDataSource';
 
 export type AppDataSnapshot = {
   fixedMealTemplates: FixedMealTemplate[];
   foods: Food[];
+  goalHistory: NutritionGoalHistoryEntry[];
   hiddenFixedMealSourceKeys: HiddenFixedMealSourceKeysByDate;
   mealsByDate: MealsByDate;
   nutritionGoalType: NutritionGoalType;
@@ -45,6 +54,10 @@ export function createDefaultAppDataSnapshot(
   return {
     fixedMealTemplates: [],
     foods,
+    goalHistory: createBaselineNutritionGoalHistory(
+      dailyTargets,
+      DEFAULT_NUTRITION_GOAL_TYPE,
+    ),
     hiddenFixedMealSourceKeys: {},
     mealsByDate,
     nutritionGoalType: DEFAULT_NUTRITION_GOAL_TYPE,
@@ -57,6 +70,7 @@ export function serializeAppDataSnapshot(data: AppDataSnapshot): string {
     version: APP_DATA_STORAGE_VERSION,
     fixedMealTemplates: data.fixedMealTemplates,
     foods: data.foods,
+    goalHistory: data.goalHistory,
     hiddenFixedMealSourceKeys: data.hiddenFixedMealSourceKeys,
     mealsByDate: data.mealsByDate,
     nutritionGoalType: data.nutritionGoalType,
@@ -69,6 +83,7 @@ export function serializeAppDataSnapshot(data: AppDataSnapshot): string {
 export function restoreAppDataSnapshot(
   rawValue: string | null,
   fallback: AppDataSnapshot,
+  todayDate: string = getLocalDateString(),
 ): AppDataSnapshot {
   if (rawValue === null) {
     return fallback;
@@ -81,25 +96,38 @@ export function restoreAppDataSnapshot(
       return fallback;
     }
 
+    const nutritionGoalType = parseNutritionGoalType(
+      parsedValue.nutritionGoalType,
+      fallback.nutritionGoalType,
+    );
+    const todayTargets = parseDailyNutritionTargets(
+      parsedValue.todayTargets,
+      fallback.todayTargets,
+    );
+    const goalHistory = parseNutritionGoalHistory(
+      parsedValue.goalHistory,
+      createNutritionGoalHistoryEntry(
+        GOAL_HISTORY_BASELINE_DATE,
+        nutritionGoalType,
+        todayTargets,
+      ),
+    );
+    const currentGoal = resolveNutritionGoalForDate(goalHistory, todayDate);
+
     return {
       fixedMealTemplates: parseFixedMealTemplates(
         parsedValue.fixedMealTemplates,
         fallback.fixedMealTemplates,
       ),
       foods: parseFoods(parsedValue.foods, fallback.foods),
+      goalHistory,
       hiddenFixedMealSourceKeys: parseHiddenFixedMealSourceKeys(
         parsedValue.hiddenFixedMealSourceKeys,
         fallback.hiddenFixedMealSourceKeys,
       ),
       mealsByDate: parseMealsByDate(parsedValue.mealsByDate, fallback.mealsByDate),
-      nutritionGoalType: parseNutritionGoalType(
-        parsedValue.nutritionGoalType,
-        fallback.nutritionGoalType,
-      ),
-      todayTargets: parseDailyNutritionTargets(
-        parsedValue.todayTargets,
-        fallback.todayTargets,
-      ),
+      nutritionGoalType: currentGoal.goalType,
+      todayTargets: currentGoal.targets,
     };
   } catch {
     return fallback;
@@ -165,8 +193,12 @@ function parseDailyNutritionTargets(
   value: unknown,
   fallback: DailyNutritionTargets,
 ): DailyNutritionTargets {
+  return parseDailyNutritionTargetsValue(value) ?? fallback;
+}
+
+function parseDailyNutritionTargetsValue(value: unknown): DailyNutritionTargets | null {
   if (!isRecord(value)) {
-    return fallback;
+    return null;
   }
 
   const parsedTargets = {
@@ -177,10 +209,53 @@ function parseDailyNutritionTargets(
   };
 
   if (Object.values(parsedTargets).some((target) => target === null)) {
-    return fallback;
+    return null;
   }
 
   return parsedTargets as DailyNutritionTargets;
+}
+
+function parseNutritionGoalHistory(
+  value: unknown,
+  legacyEntry: NutritionGoalHistoryEntry,
+): NutritionGoalHistoryEntry[] {
+  if (!Array.isArray(value)) {
+    return normalizeNutritionGoalHistory([legacyEntry]);
+  }
+
+  const parsedEntries = value.flatMap((entryValue) => {
+    const parsedEntry = parseNutritionGoalHistoryEntry(entryValue);
+
+    return parsedEntry === null ? [] : [parsedEntry];
+  });
+
+  if (parsedEntries.length === 0) {
+    return normalizeNutritionGoalHistory([legacyEntry]);
+  }
+
+  return normalizeNutritionGoalHistory(parsedEntries);
+}
+
+function parseNutritionGoalHistoryEntry(value: unknown): NutritionGoalHistoryEntry | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const effectiveDate = typeof value.effectiveDate === 'string'
+    ? value.effectiveDate
+    : null;
+  const targets = parseDailyNutritionTargetsValue(value.targets);
+
+  if (
+    effectiveDate === null
+    || !isValidLocalDateString(effectiveDate)
+    || !isNutritionGoalType(value.goalType)
+    || targets === null
+  ) {
+    return null;
+  }
+
+  return createNutritionGoalHistoryEntry(effectiveDate, value.goalType, targets);
 }
 
 function parseFoods(value: unknown, fallback: Food[]): Food[] {

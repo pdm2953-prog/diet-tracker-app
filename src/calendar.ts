@@ -9,6 +9,8 @@ import type {
 } from './models';
 import type { DailyNutritionTargets } from './nutrition';
 import { buildDailySummary } from './nutrition';
+import { resolveNutritionGoalForDate } from './goalHistory';
+import type { NutritionGoalHistoryEntry } from './goalHistory';
 import { evaluateDailyMeal } from './mealEvaluation';
 import type { MealEvaluationResult } from './mealEvaluation';
 import { getMealsForDate } from './meals';
@@ -38,14 +40,15 @@ export type CalendarDayDetails = {
   meals: Meal[];
   status: CalendarDayStatus;
   summary: DailySummary;
+  targets: DailyNutritionTargets;
 };
 
 export type BuildCalendarDayDetailsOptions = {
   date: string;
   fixedMealTemplates: FixedMealTemplate[];
+  goalHistory: NutritionGoalHistoryEntry[];
   hiddenFixedMealSourceKeys: HiddenFixedMealSourceKeysByDate;
   mealsByDate: MealsByDate;
-  targets: DailyNutritionTargets;
   todayDate: string;
 };
 
@@ -111,12 +114,13 @@ export function getCalendarDayStatusBadgeTone(
 export function buildCalendarDayDetails({
   date,
   fixedMealTemplates,
+  goalHistory,
   hiddenFixedMealSourceKeys,
   mealsByDate,
-  targets,
   todayDate,
 }: BuildCalendarDayDetailsOptions): CalendarDayDetails {
   const timestamp = `${date}T00:00:00.000`;
+  const targets = resolveNutritionGoalForDate(goalHistory, date).targets;
   const meals = applyFixedMealTemplatesToMeals({
     date,
     fixedMealTemplates,
@@ -147,6 +151,7 @@ export function buildCalendarDayDetails({
       meals,
       status: hasAnyFoods ? 'scheduled' : 'noRecord',
       summary,
+      targets,
     };
   }
 
@@ -159,6 +164,7 @@ export function buildCalendarDayDetails({
       meals,
       status: 'noRecord',
       summary,
+      targets,
     };
   }
 
@@ -175,6 +181,7 @@ export function buildCalendarDayDetails({
       meals,
       status: 'scheduled',
       summary,
+      targets,
     };
   }
 
@@ -188,6 +195,7 @@ export function buildCalendarDayDetails({
     meals,
     status: evaluation.status,
     summary,
+    targets,
   };
 }
 

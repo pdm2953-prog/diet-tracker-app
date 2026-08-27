@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { allFixedMealWeekdays } from '../src/fixedMealRecurrence';
+import {
+  GOAL_HISTORY_BASELINE_DATE,
+  createBaselineNutritionGoalHistory,
+  createNutritionGoalHistoryEntry,
+} from '../src/goalHistory';
 import type { AppDataSnapshot } from '../src/storage';
 import {
   restoreAppDataSnapshot,
@@ -17,6 +22,13 @@ function makeNutrition(overrides: Partial<Nutrition> = {}): Nutrition {
     ...createZeroNutrition(),
     ...overrides,
   };
+}
+
+function makeGoalHistory(
+  targets: AppDataSnapshot['todayTargets'],
+  goalType: AppDataSnapshot['nutritionGoalType'] = 'maintain',
+): AppDataSnapshot['goalHistory'] {
+  return createBaselineNutritionGoalHistory(targets, goalType);
 }
 
 const food: Food = {
@@ -64,21 +76,30 @@ const meal: Meal = {
   updatedAt: timestamp,
 };
 
+const fallbackTargets: AppDataSnapshot['todayTargets'] = {
+  caloriesKcal: 2000,
+  proteinG: 100,
+  carbohydrateG: 250,
+  fatG: 60,
+};
+
 const fallback: AppDataSnapshot = {
   fixedMealTemplates: [],
   foods: [food],
+  goalHistory: makeGoalHistory(fallbackTargets),
   hiddenFixedMealSourceKeys: {},
   mealsByDate: { '2026-07-23': [meal] },
   nutritionGoalType: 'maintain',
-  todayTargets: {
-    caloriesKcal: 2000,
-    proteinG: 100,
-    carbohydrateG: 250,
-    fatG: 60,
-  },
+  todayTargets: fallbackTargets,
 };
 
 test('restoreAppDataSnapshot round-trips valid versioned local data', () => {
+  const roundTripTargets: AppDataSnapshot['todayTargets'] = {
+    caloriesKcal: 2100,
+    proteinG: 110,
+    carbohydrateG: 260,
+    fatG: 65,
+  };
   const data: AppDataSnapshot = {
     fixedMealTemplates: [{
       id: 'template-storage',
@@ -100,15 +121,11 @@ test('restoreAppDataSnapshot round-trips valid versioned local data', () => {
       updatedAt: timestamp,
     }],
     foods: [food],
+    goalHistory: makeGoalHistory(roundTripTargets),
     hiddenFixedMealSourceKeys: { '2026-07-23': ['template-storage:item-storage'] },
     mealsByDate: { '2026-07-23': [meal] },
     nutritionGoalType: 'maintain',
-    todayTargets: {
-      caloriesKcal: 2100,
-      proteinG: 110,
-      carbohydrateG: 260,
-      fatG: 65,
-    },
+    todayTargets: roundTripTargets,
   };
 
   assert.deepEqual(restoreAppDataSnapshot(serializeAppDataSnapshot(data), fallback), data);
@@ -137,8 +154,13 @@ test('restoreAppDataSnapshot falls back to current goal type for legacy or inval
     todayTargets: fallback.todayTargets,
   });
 
-  assert.equal(restoreAppDataSnapshot(legacyRawValue, fallbackWithGoal).nutritionGoalType, 'diet');
-  assert.equal(restoreAppDataSnapshot(invalidRawValue, fallbackWithGoal).nutritionGoalType, 'diet');
+  const restoredLegacy = restoreAppDataSnapshot(legacyRawValue, fallbackWithGoal);
+  const restoredInvalid = restoreAppDataSnapshot(invalidRawValue, fallbackWithGoal);
+
+  assert.equal(restoredLegacy.nutritionGoalType, 'diet');
+  assert.equal(restoredInvalid.nutritionGoalType, 'diet');
+  assert.deepEqual(restoredLegacy.goalHistory, makeGoalHistory(fallback.todayTargets, 'diet'));
+  assert.deepEqual(restoredInvalid.goalHistory, makeGoalHistory(fallback.todayTargets, 'diet'));
 });
 
 test('restoreAppDataSnapshot preserves curated nutrition source metadata', () => {
@@ -168,6 +190,7 @@ test('restoreAppDataSnapshot preserves curated nutrition source metadata', () =>
   const data: AppDataSnapshot = {
     fixedMealTemplates: [],
     foods: [curatedFood],
+    goalHistory: makeGoalHistory(fallback.todayTargets),
     hiddenFixedMealSourceKeys: {},
     mealsByDate: {},
     nutritionGoalType: 'maintain',
@@ -238,6 +261,7 @@ test('restoreAppDataSnapshot preserves official soondubu curated food and meal n
   const data: AppDataSnapshot = {
     fixedMealTemplates: [],
     foods: [soondubuFood],
+    goalHistory: makeGoalHistory(fallback.todayTargets),
     hiddenFixedMealSourceKeys: {},
     mealsByDate: { '2026-08-09': [soondubuMeal] },
     nutritionGoalType: 'maintain',
@@ -282,6 +306,7 @@ test('restoreAppDataSnapshot preserves future dataSource values without dropping
   const data: AppDataSnapshot = {
     fixedMealTemplates: [],
     foods: [futureFood],
+    goalHistory: makeGoalHistory(fallback.todayTargets),
     hiddenFixedMealSourceKeys: {},
     mealsByDate: { '2026-07-23': [futureMeal] },
     nutritionGoalType: 'maintain',
@@ -379,6 +404,7 @@ test('restoreAppDataSnapshot hydrates legacy and invalid fixed meal weekdays as 
       { ...baseTemplate, id: 'partial-weekdays-template', weekdays: ['mon', 'bogus', 'wed'] },
     ],
     foods: [food],
+    goalHistory: makeGoalHistory(fallback.todayTargets),
     hiddenFixedMealSourceKeys: {},
     mealsByDate: {},
     nutritionGoalType: 'maintain',
@@ -419,6 +445,7 @@ test('restoreAppDataSnapshot normalizes malformed fixed meal weekday arrays with
       { ...baseTemplate, id: 'fully-invalid-weekdays-template', weekdays: ['bogus'] },
     ],
     foods: [food],
+    goalHistory: makeGoalHistory(fallback.todayTargets),
     hiddenFixedMealSourceKeys: {},
     mealsByDate: {},
     nutritionGoalType: 'maintain',
@@ -469,6 +496,7 @@ test('fixed meal recurrence edits, inactive state, presets, and deletes persist 
       },
     ],
     foods: [food],
+    goalHistory: makeGoalHistory(fallback.todayTargets),
     hiddenFixedMealSourceKeys: {},
     mealsByDate: {},
     nutritionGoalType: 'maintain',
@@ -492,4 +520,109 @@ test('fixed meal recurrence edits, inactive state, presets, and deletes persist 
     deletedRestored.fixedMealTemplates.map((template) => template.id),
     ['inactive-template', 'weekend-preset-template'],
   );
+});
+
+function makeRawSnapshot(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    version: 1,
+    fixedMealTemplates: [],
+    foods: [food],
+    hiddenFixedMealSourceKeys: {},
+    mealsByDate: { '2026-07-23': [meal] },
+    nutritionGoalType: 'maintain',
+    todayTargets: fallback.todayTargets,
+    ...overrides,
+  });
+}
+
+test('restoreAppDataSnapshot uses persisted compatibility targets for empty or all-invalid goal history', () => {
+  const legacyTargets: AppDataSnapshot['todayTargets'] = {
+    caloriesKcal: 2450,
+    proteinG: 155,
+    carbohydrateG: 275,
+    fatG: 72,
+  };
+  const expectedLegacyHistory = createBaselineNutritionGoalHistory(legacyTargets, 'bulk');
+  const emptyHistoryRawValue = makeRawSnapshot({
+    goalHistory: [],
+    nutritionGoalType: 'bulk',
+    todayTargets: legacyTargets,
+  });
+  const allInvalidHistoryRawValue = makeRawSnapshot({
+    goalHistory: [
+      null,
+      { effectiveDate: '2026-02-29', goalType: 'bulk', targets: legacyTargets },
+      { effectiveDate: '2026-08-19', goalType: 'view', targets: legacyTargets },
+      {
+        effectiveDate: '2026-08-19',
+        goalType: 'bulk',
+        targets: { caloriesKcal: '2450', proteinG: 155, carbohydrateG: 275, fatG: 72 },
+      },
+    ],
+    nutritionGoalType: 'bulk',
+    todayTargets: legacyTargets,
+  });
+
+  const restoredEmptyHistory = restoreAppDataSnapshot(emptyHistoryRawValue, fallback, '2026-08-19');
+  const restoredAllInvalidHistory = restoreAppDataSnapshot(allInvalidHistoryRawValue, fallback, '2026-08-19');
+
+  assert.equal(expectedLegacyHistory[0].effectiveDate, GOAL_HISTORY_BASELINE_DATE);
+  assert.deepEqual(restoredEmptyHistory.goalHistory, expectedLegacyHistory);
+  assert.equal(restoredEmptyHistory.nutritionGoalType, 'bulk');
+  assert.deepEqual(restoredEmptyHistory.todayTargets, legacyTargets);
+  assert.deepEqual(restoredAllInvalidHistory.goalHistory, expectedLegacyHistory);
+  assert.equal(restoredAllInvalidHistory.nutritionGoalType, 'bulk');
+  assert.deepEqual(restoredAllInvalidHistory.todayTargets, legacyTargets);
+});
+
+test('restoreAppDataSnapshot ignores malformed goal history entries while preserving valid source of truth', () => {
+  const conflictingCompatibilityTargets: AppDataSnapshot['todayTargets'] = {
+    caloriesKcal: 9999,
+    proteinG: 999,
+    carbohydrateG: 999,
+    fatG: 999,
+  };
+  const firstDuplicateTargets: AppDataSnapshot['todayTargets'] = {
+    caloriesKcal: 2100,
+    proteinG: 101,
+    carbohydrateG: 251,
+    fatG: 61,
+  };
+  const duplicateWinnerTargets: AppDataSnapshot['todayTargets'] = {
+    caloriesKcal: 2200,
+    proteinG: 111,
+    carbohydrateG: 261,
+    fatG: 66,
+  };
+  const futureTargets: AppDataSnapshot['todayTargets'] = {
+    caloriesKcal: 1800,
+    proteinG: 140,
+    carbohydrateG: 170,
+    fatG: 50,
+  };
+  const rawValue = makeRawSnapshot({
+    goalHistory: [
+      createNutritionGoalHistoryEntry('2026-08-25', 'bulk', futureTargets),
+      { effectiveDate: '2026-02-29', goalType: 'diet', targets: firstDuplicateTargets },
+      createNutritionGoalHistoryEntry('2026-08-01', 'diet', firstDuplicateTargets),
+      { effectiveDate: '2026-08-10', goalType: 'view', targets: firstDuplicateTargets },
+      {
+        effectiveDate: '2026-08-10',
+        goalType: 'maintain',
+        targets: { caloriesKcal: 'bad', proteinG: 111, carbohydrateG: 261, fatG: 66 },
+      },
+      createNutritionGoalHistoryEntry('2026-08-01', 'maintain', duplicateWinnerTargets),
+    ],
+    nutritionGoalType: 'bulk',
+    todayTargets: conflictingCompatibilityTargets,
+  });
+
+  const restored = restoreAppDataSnapshot(rawValue, fallback, '2026-08-19');
+
+  assert.deepEqual(restored.goalHistory, [
+    createNutritionGoalHistoryEntry('2026-08-01', 'maintain', duplicateWinnerTargets),
+    createNutritionGoalHistoryEntry('2026-08-25', 'bulk', futureTargets),
+  ]);
+  assert.equal(restored.nutritionGoalType, 'maintain');
+  assert.deepEqual(restored.todayTargets, duplicateWinnerTargets);
 });

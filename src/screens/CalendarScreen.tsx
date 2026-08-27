@@ -11,6 +11,7 @@ import {
   getCalendarDayStatusMessage,
 } from '../calendar';
 import type { CalendarDayDetails, CalendarDayStatus, MealFoodsByType } from '../calendar';
+import type { NutritionGoalHistoryEntry } from '../goalHistory';
 import {
   AppCard,
   IconButton,
@@ -33,7 +34,7 @@ import {
   nutritionLabels,
   primaryNutritionFields,
 } from '../nutrition';
-import type { DailyNutritionTargets, PrimaryNutritionField } from '../nutrition';
+import type { PrimaryNutritionField } from '../nutrition';
 import { styles } from '../styles';
 import {
   buildCalendarMonthGrid,
@@ -55,7 +56,7 @@ type CalendarScreenProps = {
   onOpenToday: () => void;
   onSelectedDateChange: (date: string) => void;
   selectedDate: string;
-  targets: DailyNutritionTargets;
+  goalHistory: NutritionGoalHistoryEntry[];
 };
 
 export function CalendarScreen({
@@ -66,7 +67,7 @@ export function CalendarScreen({
   onOpenToday,
   onSelectedDateChange,
   selectedDate,
-  targets,
+  goalHistory,
 }: CalendarScreenProps) {
   const todayDate = getLocalDateString();
   const [visibleMonth, setVisibleMonth] = useState(() =>
@@ -81,24 +82,24 @@ export function CalendarScreen({
       monthCells.map((cell) => cell.date),
       {
         fixedMealTemplates,
+        goalHistory,
         hiddenFixedMealSourceKeys,
         mealsByDate,
-        targets,
         todayDate,
       },
     ),
-    [fixedMealTemplates, hiddenFixedMealSourceKeys, mealsByDate, monthCells, targets, todayDate],
+    [fixedMealTemplates, goalHistory, hiddenFixedMealSourceKeys, mealsByDate, monthCells, todayDate],
   );
   const selectedDayDetails = useMemo(
     () => buildCalendarDayDetails({
       date: selectedDate,
       fixedMealTemplates,
+      goalHistory,
       hiddenFixedMealSourceKeys,
       mealsByDate,
-      targets,
       todayDate,
     }),
-    [fixedMealTemplates, hiddenFixedMealSourceKeys, mealsByDate, selectedDate, targets, todayDate],
+    [fixedMealTemplates, goalHistory, hiddenFixedMealSourceKeys, mealsByDate, selectedDate, todayDate],
   );
   const foodsById = useMemo<Record<string, Food>>(
     () => Object.fromEntries(foods.map((food) => [food.id, food])) as Record<string, Food>,
@@ -210,7 +211,6 @@ export function CalendarScreen({
         details={selectedDayDetails}
         foodsById={foodsById}
         onOpenToday={onOpenToday}
-        targets={targets}
       />
     </ScrollView>
   );
@@ -220,19 +220,18 @@ type SelectedDateSummaryCardProps = {
   details: CalendarDayDetails;
   foodsById: Record<string, Food>;
   onOpenToday: () => void;
-  targets: DailyNutritionTargets;
 };
 
 function SelectedDateSummaryCard({
   details,
   foodsById,
   onOpenToday,
-  targets,
 }: SelectedDateSummaryCardProps) {
   const fixedMealFoodCount = countGroupedMealFoods(details.fixedMealFoodsByType);
   const directMealFoodCount = countGroupedMealFoods(details.directMealFoodsByType);
   const calories = details.summary.checkedNutritionTotal.caloriesKcal;
   const protein = details.summary.checkedNutritionTotal.proteinG;
+  const targets = details.targets;
 
   return (
     <AppCard style={styles.calendarSummaryCard}>
