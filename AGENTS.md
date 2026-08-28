@@ -1,120 +1,83 @@
-\# AGENTS.md
+# AGENTS.md
 
+## Operating environment
 
+Codex runs on Windows for this repository. Use PowerShell syntax for shell
+commands.
 
-\## Operating environment
+Prefer Windows PowerShell for repository scripts:
 
-
-
-You are Codex running on Windows.
-
-
-
-Use PowerShell syntax for shell commands.
-
-
-
-Prefer:
-
-
-
-\~\~\~powershell
-
+```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File <script.ps1>
+```
 
-\~\~\~
+PowerShell 7 is also acceptable when `pwsh` is available:
 
-
-
-If `pwsh` is available, PowerShell 7 is also acceptable:
-
-
-
-\~\~\~powershell
-
+```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File <script.ps1>
-
-\~\~\~
-
-
+```
 
 Do not use Bash syntax unless the user explicitly asks for Bash.
 
+## Project scope discipline
 
+- Keep implementation within the Chapter's requested product and workflow
+  scope.
+- Do not expand backend or frontend scope without an explicit requirement or
+  evidence that the requested behavior requires it.
+- Do not mix product feature changes and workflow-maintenance changes in the
+  same commit.
+- During workflow maintenance, do not modify product code unless the user
+  explicitly changes the scope.
+- For normal application work, ignore `.agents/skills/` unless harness work is
+  explicitly in scope. For harness maintenance, `.agents/skills/` is in scope.
 
-\## Non-recursion rule
+## Chapter workflow
 
+Follow the Global AGENTS lifecycle without duplicating it here. The repository
+sequence is:
 
+```text
+implementation
+-> feedback/fix
+-> QA
+-> $codex-harness
+-> READY_TO_COMMIT
+-> user commit
+-> clean working tree
+```
 
-Do not call:
+Run the final `$codex-harness` only after implementation, user feedback fixes,
+and QA are complete. Severity, review-scope, environment-blocker, and gate
+rules are defined by `$codex-harness`.
 
+With the persistent workflow contracts loaded, a normal final review prompt
+should ideally be only:
 
+```text
+$codex-harness
+Chapter X final gate.
+```
 
-\- `codex`
+The user owns staging and committing. A Chapter is not complete until the user
+commits and confirms a clean working tree.
 
-\- `codex exec`
+## Validation policy
 
-\- `codex review`
+During development, run targeted validation for the changed area first. Do not
+repeat the full regression suite after every edit.
 
+The final harness baseline is:
 
+```powershell
+npm test
+npx tsc --noEmit
+backend\.venv\Scripts\python.exe -m pytest backend
+git diff --check
+git status --short
+```
 
-from inside this repository workflow unless the user explicitly asks to test Codex itself.
-
-
-
-You are already Codex.
-
-
-
-Helper scripts may collect context, run deterministic commands, and write files.
-
-Helper scripts must not spawn another model session.
-
-
-
-\## Repository workflow
-
-
-
-When reviewing code:
-
-
-
-1\. Inspect `git status`.
-
-2\. Determine the base branch.
-
-3\. Inspect the diff against base.
-
-4\. Include staged, unstaged, and untracked changes when relevant.
-
-5\. Look for real bugs, security issues, data-loss risks, Windows path issues, PowerShell quoting issues, encoding problems, and missing tests.
-
-6\. Report findings in Korean.
-
-7\. Use severity markers:
-
-&#x20;  - `\[P1]` critical blocker
-
-&#x20;  - `\[P2]` advisory or non-blocking concern
-
-8\. End with one of:
-
-&#x20;  - `GATE: PASS`
-
-&#x20;  - `GATE: PASS\_WITH\_NOTES`
-
-&#x20;  - `GATE: FAIL`
-
-
-
-\## Scope boundary
-
-
-
-When reviewing normal application code, ignore `.agents/skills/` unless the user is explicitly working on Codex harness skills.
-
-
-
-When the user is working on this harness, `.agents/skills/` is in scope.
+Add Chapter-specific validation when the Chapter contract requires it. If a
+required validation cannot run, apply the `$codex-harness`
+Environment/Tooling Blocker contract.
 

@@ -1,198 +1,513 @@
 $ErrorActionPreference = "Stop"
 
+$script:CollectorFailures = @()
+
+function Add-CollectorFailure {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Operation,
+
+        [Parameter(Mandatory)]
+        [string]$ExitCode,
+
+        [Parameter(Mandatory)]
+        [string]$ErrorSummary
+    )
+
+    $script:CollectorFailures += [PSCustomObject]@{
+        Operation    = $Operation
+        ExitCode     = $ExitCode
+        ErrorSummary = $ErrorSummary
+    }
+}
+
+function Get-ErrorSummary {
+    param(
+        [AllowEmptyString()]
+        [string]$Text
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return "No stderr or error output was captured."
+    }
+
+    $Summary = ($Text -replace "\s+", " ").Trim()
+
+    if ($Summary.Length -gt 500) {
+        return $Summary.Substring(0, 500) + "..."
+    }
+
+    return $Summary
+}
+
 function Invoke-GitText {
     param(
         [Parameter(Mandatory)]
-        [string[]]$GitArgs
+        [string]$Operation,
+
+        [Parameter(Mandatory)]
+        [string[]]$GitArgs,
+
+        [switch]$Optional
     )
 
+    $PreviousErrorActionPreference = $ErrorActionPreference
+    $ExitCode = -1
+    $Text = ""
+    $ErrorText = ""
+    $StdErrPath = ""
+
     try {
-        $Output = & git @GitArgs 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            return ""
+        $ErrorActionPreference = "Continue"
+        $StdErrPath = [System.IO.Path]::GetTempFileName()
+        $RawOutput = @(& git @GitArgs 2> $StdErrPath)
+        $ExitCode = $LASTEXITCODE
+        $Text = ($RawOutput | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+
+        if (Test-Path -LiteralPath $StdErrPath) {
+            $ErrorText = Get-Content -LiteralPath $StdErrPath -Raw -ErrorAction SilentlyContinue
+        }
+    } catch {
+        $ErrorText = $_.Exception.Message
+    } finally {
+        $ErrorActionPreference = $PreviousErrorActionPreference
+
+        if ($StdErrPath -and (Test-Path -LiteralPath $StdErrPath)) {
+            Remove-Item -LiteralPath $StdErrPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    if ($ExitCode -ne 0) {
+        $FailureText = if ([string]::IsNullOrWhiteSpace($ErrorText)) { $Text } else { $ErrorText }
+        $Summary = Get-ErrorSummary -Text $FailureText
+
+        if (-not $Optional) {
+            Add-CollectorFailure -Operation $Operation -ExitCode ([string]$ExitCode) -ErrorSummary $Summary
         }
 
-        return ($Output | Out-String)
-    } catch {
-        return ""
+        $FailureOutput = if ($Optional) { "" } else { "[COLLECTION FAILED: $Operation]" }
+
+        return [PSCustomObject]@{
+            Success      = $false
+            ExitCode     = $ExitCode
+            Output       = $FailureOutput
+            ErrorSummary = $Summary
+        }
     }
+
+    return [PSCustomObject]@{
+        Success      = $true
+        ExitCode     = $ExitCode
+        Output       = $Text
+        ErrorSummary = ""
+    }
+}
+
+function Get-SectionText {
+    param(
+        [Parameter(Mandatory)]
+        [PSCustomObject]$Result
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Result.Output)) {
+        return "(none)"
+    }
+
+    return $Result.Output
 }
 
 $OutDir = ".codex-harness"
 $OutFile = Join-Path $OutDir "review-context.md"
+$Fence = '````'
 
-if (!(Test-Path $OutDir)) {
+if (!(Test-Path -LiteralPath $OutDir)) {
     New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 }
 
-$InsideGit = Invoke-GitText @("rev-parse", "--is-inside-work-tree")
+$InsideGitResult = Invoke-GitText -Operation "confirm Git work tree" -GitArgs @(
+    "rev-parse",
+    "--is-inside-work-tree"
+)
+$RepoRootResult = Invoke-GitText -Operation "resolve repository root" -GitArgs @(
+    "rev-parse",
+    "--show-toplevel"
+)
+$CurrentBranchResult = Invoke-GitText -Operation "resolve current branch" -GitArgs @(
+    "branch",
+    "--show-current"
+)
 
-if ($InsideGit.Trim() -ne "true") {
-    throw "Not inside a git repository."
-}
-
-$RepoRoot = (Invoke-GitText @("rev-parse", "--show-toplevel")).Trim()
-$CurrentBranch = (Invoke-GitText @("branch", "--show-current")).Trim()
-
-if (-not $CurrentBranch) {
-    $CurrentBranch = "unknown"
-}
-
-$HasHead = $false
-$HeadCheck = Invoke-GitText @("rev-parse", "--verify", "HEAD")
-
-if ($HeadCheck.Trim()) {
-    $HasHead = $true
-}
-
-$BaseBranch = ""
-
-$OriginHead = Invoke-GitText @("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
-
-if ($OriginHead.Trim()) {
-    $BaseBranch = $OriginHead.Trim() -replace "refs/remotes/origin/", ""
-}
-
-if (-not $BaseBranch) {
-    $OriginMain = Invoke-GitText @("rev-parse", "--verify", "origin/main")
-    if ($OriginMain.Trim()) {
-        $BaseBranch = "main"
-    }
-}
-
-if (-not $BaseBranch) {
-    $OriginMaster = Invoke-GitText @("rev-parse", "--verify", "origin/master")
-    if ($OriginMaster.Trim()) {
-        $BaseBranch = "master"
-    }
-}
-
-if (-not $BaseBranch) {
-    $LocalMain = Invoke-GitText @("rev-parse", "--verify", "main")
-    if ($LocalMain.Trim()) {
-        $BaseBranch = "main"
-    }
-}
-
-if (-not $BaseBranch) {
-    $LocalMaster = Invoke-GitText @("rev-parse", "--verify", "master")
-    if ($LocalMaster.Trim()) {
-        $BaseBranch = "master"
-    }
-}
-
-if (-not $BaseBranch) {
-    $BaseBranch = "main"
-}
-
-$BaseRef = ""
-
-$OriginBaseCheck = Invoke-GitText @("rev-parse", "--verify", "origin/$BaseBranch")
-
-if ($OriginBaseCheck.Trim()) {
-    $BaseRef = "origin/$BaseBranch"
+$InsideGit = if ($InsideGitResult.Success) {
+    $InsideGitResult.Output.Trim()
 } else {
-    $LocalBaseCheck = Invoke-GitText @("rev-parse", "--verify", $BaseBranch)
+    "[COLLECTION FAILED: confirm Git work tree]"
+}
 
-    if ($LocalBaseCheck.Trim()) {
-        $BaseRef = $BaseBranch
+$RepoRoot = if ($RepoRootResult.Success -and $RepoRootResult.Output.Trim()) {
+    $RepoRootResult.Output.Trim()
+} else {
+    "[COLLECTION FAILED: resolve repository root]"
+}
+
+$CurrentBranch = if (-not $CurrentBranchResult.Success) {
+    "[COLLECTION FAILED: resolve current branch]"
+} elseif ($CurrentBranchResult.Output.Trim()) {
+    $CurrentBranchResult.Output.Trim()
+} else {
+    "(detached HEAD)"
+}
+
+$HeadCheck = Invoke-GitText -Operation "probe HEAD commit" -GitArgs @(
+    "rev-parse",
+    "--verify",
+    "HEAD"
+) -Optional
+$HasHead = $HeadCheck.Success -and -not [string]::IsNullOrWhiteSpace($HeadCheck.Output)
+
+$BaseBranch = "(unresolved)"
+$BaseRef = "(unresolved)"
+$BaseRefResolution = "UNRESOLVED"
+
+$OriginHead = Invoke-GitText -Operation "probe origin HEAD" -GitArgs @(
+    "symbolic-ref",
+    "--quiet",
+    "refs/remotes/origin/HEAD"
+) -Optional
+
+if ($OriginHead.Success -and $OriginHead.Output.Trim() -match '^refs/remotes/origin/(.+)$') {
+    $BaseBranch = $Matches[1]
+}
+
+if ($BaseBranch -eq "(unresolved)") {
+    $OriginMain = Invoke-GitText -Operation "probe origin/main" -GitArgs @(
+        "rev-parse",
+        "--verify",
+        "origin/main"
+    ) -Optional
+
+    if ($OriginMain.Success) {
+        $BaseBranch = "main"
     }
 }
 
-$GitStatus = Invoke-GitText @("status", "--short")
+if ($BaseBranch -eq "(unresolved)") {
+    $OriginMaster = Invoke-GitText -Operation "probe origin/master" -GitArgs @(
+        "rev-parse",
+        "--verify",
+        "origin/master"
+    ) -Optional
 
-$BranchDiffStat = ""
-$BranchDiffNameOnly = ""
-$BranchDiff = ""
-
-if ($HasHead -and $BaseRef) {
-    $BranchDiffStat = Invoke-GitText @("diff", "$BaseRef...HEAD", "--stat")
-    $BranchDiffNameOnly = Invoke-GitText @("diff", "$BaseRef...HEAD", "--name-only")
-    $BranchDiff = Invoke-GitText @("diff", "$BaseRef...HEAD")
+    if ($OriginMaster.Success) {
+        $BaseBranch = "master"
+    }
 }
 
-$StagedDiffStat = Invoke-GitText @("diff", "--cached", "--stat")
-$StagedDiffNameOnly = Invoke-GitText @("diff", "--cached", "--name-only")
-$StagedDiff = Invoke-GitText @("diff", "--cached")
+if ($BaseBranch -eq "(unresolved)") {
+    $LocalMain = Invoke-GitText -Operation "probe local main" -GitArgs @(
+        "rev-parse",
+        "--verify",
+        "main"
+    ) -Optional
 
-$UnstagedDiffStat = Invoke-GitText @("diff", "--stat")
-$UnstagedDiffNameOnly = Invoke-GitText @("diff", "--name-only")
-$UnstagedDiff = Invoke-GitText @("diff")
+    if ($LocalMain.Success) {
+        $BaseBranch = "main"
+    }
+}
 
-$UntrackedFiles = Invoke-GitText @("ls-files", "--others", "--exclude-standard")
+if ($BaseBranch -eq "(unresolved)") {
+    $LocalMaster = Invoke-GitText -Operation "probe local master" -GitArgs @(
+        "rev-parse",
+        "--verify",
+        "master"
+    ) -Optional
 
-$UntrackedPreview = ""
+    if ($LocalMaster.Success) {
+        $BaseBranch = "master"
+    }
+}
 
-$UntrackedList = $UntrackedFiles -split "`r?`n" | Where-Object {
-    $_ -and $_.Trim()
+if (-not $HasHead) {
+    $BaseRefResolution = "NOT_APPLICABLE_NO_HEAD"
+} elseif ($BaseBranch -ne "(unresolved)") {
+    $OriginBaseCheck = Invoke-GitText -Operation "probe origin base ref" -GitArgs @(
+        "rev-parse",
+        "--verify",
+        "origin/$BaseBranch"
+    ) -Optional
+
+    if ($OriginBaseCheck.Success) {
+        $BaseRef = "origin/$BaseBranch"
+        $BaseRefResolution = "RESOLVED"
+    } else {
+        $LocalBaseCheck = Invoke-GitText -Operation "probe local base ref" -GitArgs @(
+            "rev-parse",
+            "--verify",
+            $BaseBranch
+        ) -Optional
+
+        if ($LocalBaseCheck.Success) {
+            $BaseRef = $BaseBranch
+            $BaseRefResolution = "RESOLVED"
+        }
+    }
+}
+
+if ($HasHead -and $BaseRefResolution -ne "RESOLVED") {
+    Add-CollectorFailure `
+        -Operation "resolve base ref" `
+        -ExitCode "N/A" `
+        -ErrorSummary "No usable origin or local main/master base ref was found."
+}
+
+$GitStatusResult = Invoke-GitText -Operation "collect git status --short" -GitArgs @(
+    "status",
+    "--short"
+)
+
+if ($HasHead -and $BaseRefResolution -eq "RESOLVED") {
+    $BranchDiffStatResult = Invoke-GitText -Operation "collect committed branch diff stat" -GitArgs @(
+        "diff",
+        "$BaseRef...HEAD",
+        "--stat"
+    )
+    $BranchDiffNameOnlyResult = Invoke-GitText -Operation "collect committed branch changed files" -GitArgs @(
+        "diff",
+        "$BaseRef...HEAD",
+        "--name-only"
+    )
+    $BranchDiffResult = Invoke-GitText -Operation "collect committed branch diff" -GitArgs @(
+        "diff",
+        "$BaseRef...HEAD"
+    )
+} else {
+    $BranchContextReason = if (-not $HasHead) {
+        "[NOT COLLECTED: repository has no HEAD commit]"
+    } else {
+        "[COLLECTION FAILED: committed/base context unavailable]"
+    }
+
+    $BranchDiffStatResult = [PSCustomObject]@{ Output = $BranchContextReason }
+    $BranchDiffNameOnlyResult = [PSCustomObject]@{ Output = $BranchContextReason }
+    $BranchDiffResult = [PSCustomObject]@{ Output = $BranchContextReason }
+}
+
+$StagedDiffStatResult = Invoke-GitText -Operation "collect staged diff stat" -GitArgs @(
+    "diff",
+    "--cached",
+    "--stat"
+)
+$StagedDiffNameOnlyResult = Invoke-GitText -Operation "collect staged changed files" -GitArgs @(
+    "diff",
+    "--cached",
+    "--name-only"
+)
+$StagedDiffResult = Invoke-GitText -Operation "collect staged diff" -GitArgs @(
+    "diff",
+    "--cached"
+)
+
+$UnstagedDiffStatResult = Invoke-GitText -Operation "collect unstaged diff stat" -GitArgs @(
+    "diff",
+    "--stat"
+)
+$UnstagedDiffNameOnlyResult = Invoke-GitText -Operation "collect unstaged changed files" -GitArgs @(
+    "diff",
+    "--name-only"
+)
+$UnstagedDiffResult = Invoke-GitText -Operation "collect unstaged diff" -GitArgs @(
+    "diff"
+)
+
+$UntrackedFilesResult = Invoke-GitText -Operation "collect untracked files" -GitArgs @(
+    "ls-files",
+    "--others",
+    "--exclude-standard"
+)
+
+$UntrackedPreviewSections = @()
+$UntrackedList = @()
+
+if ($UntrackedFilesResult.Success) {
+    $UntrackedList = $UntrackedFilesResult.Output -split "`r?`n" | Where-Object {
+        $_ -and $_.Trim()
+    }
 }
 
 foreach ($File in $UntrackedList) {
     $Path = $File.Trim()
 
-    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+    try {
+        if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+            Add-CollectorFailure `
+                -Operation "preview untracked file: $Path" `
+                -ExitCode "N/A" `
+                -ErrorSummary "The untracked path was not a readable file."
+            $UntrackedPreviewSections += "### $Path`r`n`r`n[COLLECTION FAILED: untracked preview unavailable]"
+            continue
+        }
+
         $Item = Get-Item -LiteralPath $Path
 
-        if ($Item.Length -le 200KB) {
-            $Body = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
-            $UntrackedPreview += @"
+        if ($Item.Length -gt 200KB) {
+            $UntrackedPreviewSections += "### $Path`r`n`r`nFile is larger than 200KB. Preview skipped."
+            continue
+        }
 
+        $Body = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+        $UntrackedPreviewSections += @"
 ### $Path
 
-````text
+${Fence}text
 $Body
+$Fence
 "@
+    } catch {
+        $Summary = Get-ErrorSummary -Text $_.Exception.Message
+        Add-CollectorFailure `
+            -Operation "preview untracked file: $Path" `
+            -ExitCode "N/A" `
+            -ErrorSummary $Summary
+        $UntrackedPreviewSections += "### $Path`r`n`r`n[COLLECTION FAILED: untracked preview unavailable]"
+    }
+}
+
+$CollectorStatus = if ($script:CollectorFailures.Count -eq 0) {
+    "OK"
 } else {
-$UntrackedPreview += @"
-
-$Path
-
-File is larger than 200KB. Preview skipped.
-
-"@
+    "DEGRADED"
 }
+
+$FailureText = if ($script:CollectorFailures.Count -eq 0) {
+    "- none"
+} else {
+    ($script:CollectorFailures | ForEach-Object {
+        "- $($_.Operation) / exit code: $($_.ExitCode) / $($_.ErrorSummary)"
+    }) -join [Environment]::NewLine
 }
+
+$UntrackedPreview = if ($UntrackedPreviewSections.Count -eq 0) {
+    "(none)"
+} else {
+    $UntrackedPreviewSections -join ([Environment]::NewLine + [Environment]::NewLine)
 }
+
+$GitStatus = Get-SectionText -Result $GitStatusResult
+$BranchDiffStat = Get-SectionText -Result $BranchDiffStatResult
+$BranchDiffNameOnly = Get-SectionText -Result $BranchDiffNameOnlyResult
+$BranchDiff = Get-SectionText -Result $BranchDiffResult
+$StagedDiffStat = Get-SectionText -Result $StagedDiffStatResult
+$StagedDiffNameOnly = Get-SectionText -Result $StagedDiffNameOnlyResult
+$StagedDiff = Get-SectionText -Result $StagedDiffResult
+$UnstagedDiffStat = Get-SectionText -Result $UnstagedDiffStatResult
+$UnstagedDiffNameOnly = Get-SectionText -Result $UnstagedDiffNameOnlyResult
+$UnstagedDiff = Get-SectionText -Result $UnstagedDiffResult
+$UntrackedFiles = Get-SectionText -Result $UntrackedFilesResult
 
 $Content = @"
+# Codex Harness Review Context
 
-Codex Harness Review Context
-Repository
+## Collector Diagnostics
+
+Collector Status: $CollectorStatus
+Base ref resolution: $BaseRefResolution
+
+Failures:
+$FailureText
+
+## Repository
+
+Inside Git work tree: $InsideGit
 Repo root: $RepoRoot
 Current branch: $CurrentBranch
 Base branch: $BaseBranch
-Base ref used for committed branch diff: $BaseRef
+Base ref used for committed branch context: $BaseRef
 Has HEAD commit: $HasHead
-Git status
+
+## Git Status
+
+${Fence}text
 $GitStatus
-Branch diff stat
+$Fence
+
+## Committed Branch Context
+
+This section is supporting base-branch context only.
+
+### Diff stat
+
+${Fence}text
 $BranchDiffStat
-Branch changed files
+$Fence
+
+### Changed files
+
+${Fence}text
 $BranchDiffNameOnly
-Branch diff
+$Fence
+
+### Diff
+
+${Fence}diff
 $BranchDiff
-Staged diff stat
+$Fence
+
+## Staged Changes
+
+### Diff stat
+
+${Fence}text
 $StagedDiffStat
-Staged changed files
+$Fence
+
+### Changed files
+
+${Fence}text
 $StagedDiffNameOnly
-Staged diff
+$Fence
+
+### Diff
+
+${Fence}diff
 $StagedDiff
-Unstaged diff stat
+$Fence
+
+## Unstaged Changes
+
+### Diff stat
+
+${Fence}text
 $UnstagedDiffStat
-Unstaged changed files
+$Fence
+
+### Changed files
+
+${Fence}text
 $UnstagedDiffNameOnly
-Unstaged diff
+$Fence
+
+### Diff
+
+${Fence}diff
 $UnstagedDiff
-Untracked files
+$Fence
+
+## Untracked Files
+
+${Fence}text
 $UntrackedFiles
-Untracked file previews
+$Fence
+
+## Untracked File Previews
 
 $UntrackedPreview
 "@
 
-$Content | Set-Content -Path $OutFile -Encoding UTF8
+$Content | Set-Content -LiteralPath $OutFile -Encoding UTF8
 
 Write-Host "Review context written to $OutFile"
+Write-Host "Collector Status: $CollectorStatus"
+Write-Host "Collector failures: $($script:CollectorFailures.Count)"
 Write-Host "Base branch: $BaseBranch"
 Write-Host "Base ref: $BaseRef"
+Write-Host "Base ref resolution: $BaseRefResolution"
 Write-Host "Has HEAD commit: $HasHead"
