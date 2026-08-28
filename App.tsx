@@ -15,13 +15,13 @@ import {
   setFixedMealTemplateActive,
   setFixedMealTemplateWeekdays,
 } from './src/fixedMeals';
-import {
-  createNutritionGoalHistoryEntry,
-  resolveNutritionGoalForDate,
-  upsertNutritionGoalHistoryEntry,
-} from './src/goalHistory';
+import { resolveNutritionGoalForDate } from './src/goalHistory';
 import type { NutritionGoalHistoryEntry } from './src/goalHistory';
-import { shouldPersistAppDataSnapshot, shouldRenderInteractiveApp } from './src/appHydration';
+import {
+  getAppHydrationRenderState,
+  shouldPersistAppDataSnapshot,
+} from './src/appHydration';
+import { saveNutritionGoal } from './src/goalSetup';
 import { getMealsForDate, hasValidGramServing, normalizeConsumedGrams } from './src/meals';
 import { bottomTabs, getGoalSetupScreenKey } from './src/navigation';
 import type { ScreenKey } from './src/navigation';
@@ -57,6 +57,7 @@ type InitialAppState = {
   fixedMealTemplates: FixedMealTemplate[];
   foods: Food[];
   goalHistory: NutritionGoalHistoryEntry[];
+  hasCompletedGoalSetup: boolean;
   hiddenFixedMealSourceKeys: HiddenFixedMealSourceKeysByDate;
   mealsByDate: MealsByDate;
   nutritionGoalType: NutritionGoalType;
@@ -80,6 +81,7 @@ function createInitialAppState(): InitialAppState {
     fixedMealTemplates: fallbackData.fixedMealTemplates,
     foods: fallbackData.foods,
     goalHistory: fallbackData.goalHistory,
+    hasCompletedGoalSetup: fallbackData.hasCompletedGoalSetup,
     hiddenFixedMealSourceKeys: fallbackData.hiddenFixedMealSourceKeys,
     mealsByDate: fallbackData.mealsByDate,
     nutritionGoalType: fallbackData.nutritionGoalType,
@@ -116,6 +118,9 @@ export default function App() {
     useState<HiddenFixedMealSourceKeysByDate>(initialAppState.hiddenFixedMealSourceKeys);
   const [goalHistory, setGoalHistory] = useState<NutritionGoalHistoryEntry[]>(
     initialAppState.goalHistory,
+  );
+  const [hasCompletedGoalSetup, setHasCompletedGoalSetup] = useState(
+    initialAppState.hasCompletedGoalSetup,
   );
   const [storageLoaded, setStorageLoaded] = useState(false);
   const todayDate = getLocalDateString();
@@ -158,6 +163,7 @@ export default function App() {
       fixedMealTemplates: initialAppState.fixedMealTemplates,
       foods: initialAppState.foods,
       goalHistory: initialAppState.goalHistory,
+      hasCompletedGoalSetup: initialAppState.hasCompletedGoalSetup,
       hiddenFixedMealSourceKeys: initialAppState.hiddenFixedMealSourceKeys,
       mealsByDate: initialAppState.mealsByDate,
       nutritionGoalType: initialAppState.nutritionGoalType,
@@ -172,6 +178,7 @@ export default function App() {
       setFixedMealTemplates(restoredData.fixedMealTemplates);
       setFoods(restoredData.foods);
       setGoalHistory(restoredData.goalHistory);
+      setHasCompletedGoalSetup(restoredData.hasCompletedGoalSetup);
       setHiddenFixedMealSourceKeys(restoredData.hiddenFixedMealSourceKeys);
       setMealsByDate(restoredData.mealsByDate);
       setStorageLoaded(true);
@@ -183,7 +190,7 @@ export default function App() {
   }, [initialAppState]);
 
   useEffect(() => {
-    if (!shouldPersistAppDataSnapshot(storageLoaded)) {
+    if (!shouldPersistAppDataSnapshot(storageLoaded, hasCompletedGoalSetup)) {
       return;
     }
 
@@ -191,12 +198,22 @@ export default function App() {
       fixedMealTemplates,
       foods,
       goalHistory,
+      hasCompletedGoalSetup,
       hiddenFixedMealSourceKeys,
       mealsByDate,
       nutritionGoalType: todayGoal.goalType,
       todayTargets: todayGoal.targets,
     });
-  }, [fixedMealTemplates, foods, goalHistory, hiddenFixedMealSourceKeys, mealsByDate, storageLoaded, todayGoal]);
+  }, [
+    fixedMealTemplates,
+    foods,
+    goalHistory,
+    hasCompletedGoalSetup,
+    hiddenFixedMealSourceKeys,
+    mealsByDate,
+    storageLoaded,
+    todayGoal,
+  ]);
 
   const updateSelectedDateMeals = (
     updatedAt: string,
@@ -344,21 +361,48 @@ export default function App() {
     targets: DailyNutritionTargets,
     goalType: NutritionGoalType,
   ) => {
-    setGoalHistory((currentGoalHistory) =>
-      upsertNutritionGoalHistoryEntry(
-        currentGoalHistory,
-        createNutritionGoalHistoryEntry(getLocalDateString(), goalType, targets),
-      ),
-    );
+    const isFirstRunGoalSetup = !hasCompletedGoalSetup;
+
+    setGoalHistory((currentGoalHistory) => saveNutritionGoal({
+      effectiveDate: getLocalDateString(),
+      goalHistory: currentGoalHistory,
+      goalType,
+      hasCompletedGoalSetup,
+      targets,
+    }).goalHistory);
+    if (isFirstRunGoalSetup) {
+      setHasCompletedGoalSetup(true);
+      setActiveTab('today');
+    }
   };
 
-  if (!shouldRenderInteractiveApp(storageLoaded)) {
+  const appRenderState = getAppHydrationRenderState(
+    storageLoaded,
+    hasCompletedGoalSetup,
+  );
+
+  if (appRenderState === 'loading') {
     return (
       <SafeAreaView style={styles.root}>
         <StatusBar style="dark" />
         <View style={styles.loadingScreen}>
           <Text style={styles.loadingTitle}>식단 데이터를 불러오는 중</Text>
           <Text style={styles.loadingText}>저장된 식단과 목표를 확인하고 있습니다.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (appRenderState === 'goal-setup') {
+    return (
+      <SafeAreaView style={styles.root}>
+        <StatusBar style="dark" />
+        <View style={styles.appContent}>
+          <TargetScreen
+            currentGoalType={todayGoal.goalType}
+            currentTargets={todayGoal.targets}
+            onTargetsChange={applyTargetsFromGoalSetup}
+          />
         </View>
       </SafeAreaView>
     );

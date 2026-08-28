@@ -100,13 +100,16 @@ test('Chapter 5-B Target save flow uses local today and same-day replacement sem
   );
   const currentGoal = resolveNutritionGoalForDate(updatedHistory, todayDate);
   const appSource = readSource('App.tsx');
+  const goalSetupSource = readSource('src/goalSetup.ts');
 
   assert.equal(updatedHistory.length, 2);
   assert.deepEqual(updatedHistory.map((entry) => entry.effectiveDate), ['2026-08-01', todayDate]);
   assert.deepEqual(resolveNutritionGoalForDate(updatedHistory, '2026-08-18').targets, oldTargets);
   assert.equal(currentGoal.goalType, 'bulk');
   assert.deepEqual(currentGoal.targets, futureTargets);
-  assert.equal(appSource.includes('createNutritionGoalHistoryEntry(getLocalDateString(), goalType, targets)'), true);
+  assert.equal(appSource.includes('effectiveDate: getLocalDateString()'), true);
+  assert.equal(appSource.includes('saveNutritionGoal({'), true);
+  assert.equal(goalSetupSource.includes('upsertNutritionGoalHistoryEntry(goalHistory, entry)'), true);
   assert.equal(/nutritionGoalType: todayGoal\.goalType/.test(appSource), true);
   assert.equal(/todayTargets: todayGoal\.targets/.test(appSource), true);
 });

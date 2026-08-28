@@ -1,15 +1,26 @@
-export type AppHydrationRenderState = 'loading' | 'interactive';
+export type AppHydrationRenderState = 'loading' | 'goal-setup' | 'interactive';
 
 export function getAppHydrationRenderState(
   storageLoaded: boolean,
+  hasCompletedGoalSetup: boolean,
 ): AppHydrationRenderState {
-  return storageLoaded ? 'interactive' : 'loading';
+  if (!storageLoaded) {
+    return 'loading';
+  }
+
+  return hasCompletedGoalSetup ? 'interactive' : 'goal-setup';
 }
 
-export function shouldRenderInteractiveApp(storageLoaded: boolean): boolean {
-  return getAppHydrationRenderState(storageLoaded) === 'interactive';
+export function shouldRenderInteractiveApp(
+  storageLoaded: boolean,
+  hasCompletedGoalSetup: boolean,
+): boolean {
+  return getAppHydrationRenderState(storageLoaded, hasCompletedGoalSetup) === 'interactive';
 }
 
-export function shouldPersistAppDataSnapshot(storageLoaded: boolean): boolean {
-  return storageLoaded;
+export function shouldPersistAppDataSnapshot(
+  storageLoaded: boolean,
+  hasCompletedGoalSetup: boolean,
+): boolean {
+  return storageLoaded && hasCompletedGoalSetup;
 }

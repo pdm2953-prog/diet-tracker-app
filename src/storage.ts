@@ -28,6 +28,7 @@ export type AppDataSnapshot = {
   fixedMealTemplates: FixedMealTemplate[];
   foods: Food[];
   goalHistory: NutritionGoalHistoryEntry[];
+  hasCompletedGoalSetup: boolean;
   hiddenFixedMealSourceKeys: HiddenFixedMealSourceKeysByDate;
   mealsByDate: MealsByDate;
   nutritionGoalType: NutritionGoalType;
@@ -58,6 +59,7 @@ export function createDefaultAppDataSnapshot(
       dailyTargets,
       DEFAULT_NUTRITION_GOAL_TYPE,
     ),
+    hasCompletedGoalSetup: false,
     hiddenFixedMealSourceKeys: {},
     mealsByDate,
     nutritionGoalType: DEFAULT_NUTRITION_GOAL_TYPE,
@@ -71,6 +73,7 @@ export function serializeAppDataSnapshot(data: AppDataSnapshot): string {
     fixedMealTemplates: data.fixedMealTemplates,
     foods: data.foods,
     goalHistory: data.goalHistory,
+    hasCompletedGoalSetup: data.hasCompletedGoalSetup,
     hiddenFixedMealSourceKeys: data.hiddenFixedMealSourceKeys,
     mealsByDate: data.mealsByDate,
     nutritionGoalType: data.nutritionGoalType,
@@ -121,6 +124,9 @@ export function restoreAppDataSnapshot(
       ),
       foods: parseFoods(parsedValue.foods, fallback.foods),
       goalHistory,
+      hasCompletedGoalSetup: parseHasCompletedGoalSetup(
+        parsedValue.hasCompletedGoalSetup,
+      ),
       hiddenFixedMealSourceKeys: parseHiddenFixedMealSourceKeys(
         parsedValue.hiddenFixedMealSourceKeys,
         fallback.hiddenFixedMealSourceKeys,
@@ -187,6 +193,10 @@ function parseNutritionGoalType(
   fallback: NutritionGoalType,
 ): NutritionGoalType {
   return isNutritionGoalType(value) ? value : fallback;
+}
+
+function parseHasCompletedGoalSetup(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : true;
 }
 
 function parseDailyNutritionTargets(

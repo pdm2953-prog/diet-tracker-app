@@ -25,13 +25,22 @@ test('today and past selected dates keep the existing evaluation mode', () => {
 });
 
 test('hydration hides the interactive app until storage restore completes', () => {
-  assert.equal(getAppHydrationRenderState(false), 'loading');
-  assert.equal(shouldRenderInteractiveApp(false), false);
-  assert.equal(shouldPersistAppDataSnapshot(false), false);
+  assert.equal(getAppHydrationRenderState(false, false), 'loading');
+  assert.equal(getAppHydrationRenderState(false, true), 'loading');
+  assert.equal(shouldRenderInteractiveApp(false, false), false);
+  assert.equal(shouldPersistAppDataSnapshot(false, false), false);
+});
 
-  assert.equal(getAppHydrationRenderState(true), 'interactive');
-  assert.equal(shouldRenderInteractiveApp(true), true);
-  assert.equal(shouldPersistAppDataSnapshot(true), true);
+test('hydrated first-run users stay in goal setup without persisting fallback data', () => {
+  assert.equal(getAppHydrationRenderState(true, false), 'goal-setup');
+  assert.equal(shouldRenderInteractiveApp(true, false), false);
+  assert.equal(shouldPersistAppDataSnapshot(true, false), false);
+});
+
+test('hydrated users enter the interactive app only after goal setup completion', () => {
+  assert.equal(getAppHydrationRenderState(true, true), 'interactive');
+  assert.equal(shouldRenderInteractiveApp(true, true), true);
+  assert.equal(shouldPersistAppDataSnapshot(true, true), true);
 });
 
 test('scheduled summary badges use a dedicated non-danger tone', () => {

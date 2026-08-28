@@ -87,6 +87,7 @@ const fallback: AppDataSnapshot = {
   fixedMealTemplates: [],
   foods: [food],
   goalHistory: makeGoalHistory(fallbackTargets),
+  hasCompletedGoalSetup: false,
   hiddenFixedMealSourceKeys: {},
   mealsByDate: { '2026-07-23': [meal] },
   nutritionGoalType: 'maintain',
@@ -122,6 +123,7 @@ test('restoreAppDataSnapshot round-trips valid versioned local data', () => {
     }],
     foods: [food],
     goalHistory: makeGoalHistory(roundTripTargets),
+    hasCompletedGoalSetup: true,
     hiddenFixedMealSourceKeys: { '2026-07-23': ['template-storage:item-storage'] },
     mealsByDate: { '2026-07-23': [meal] },
     nutritionGoalType: 'maintain',
@@ -129,6 +131,29 @@ test('restoreAppDataSnapshot round-trips valid versioned local data', () => {
   };
 
   assert.deepEqual(restoreAppDataSnapshot(serializeAppDataSnapshot(data), fallback), data);
+});
+
+test('restoreAppDataSnapshot preserves goal setup completion and keeps missing storage incomplete', () => {
+  const completedData: AppDataSnapshot = {
+    ...fallback,
+    hasCompletedGoalSetup: true,
+  };
+  const incompleteData: AppDataSnapshot = {
+    ...fallback,
+    hasCompletedGoalSetup: false,
+  };
+
+  assert.equal(restoreAppDataSnapshot(null, fallback).hasCompletedGoalSetup, false);
+  assert.equal(
+    restoreAppDataSnapshot(serializeAppDataSnapshot(completedData), fallback)
+      .hasCompletedGoalSetup,
+    true,
+  );
+  assert.equal(
+    restoreAppDataSnapshot(serializeAppDataSnapshot(incompleteData), fallback)
+      .hasCompletedGoalSetup,
+    false,
+  );
 });
 
 test('restoreAppDataSnapshot falls back to current goal type for legacy or invalid stored values', () => {
@@ -159,6 +184,8 @@ test('restoreAppDataSnapshot falls back to current goal type for legacy or inval
 
   assert.equal(restoredLegacy.nutritionGoalType, 'diet');
   assert.equal(restoredInvalid.nutritionGoalType, 'diet');
+  assert.equal(restoredLegacy.hasCompletedGoalSetup, true);
+  assert.equal(restoredInvalid.hasCompletedGoalSetup, true);
   assert.deepEqual(restoredLegacy.goalHistory, makeGoalHistory(fallback.todayTargets, 'diet'));
   assert.deepEqual(restoredInvalid.goalHistory, makeGoalHistory(fallback.todayTargets, 'diet'));
 });
@@ -191,6 +218,7 @@ test('restoreAppDataSnapshot preserves curated nutrition source metadata', () =>
     fixedMealTemplates: [],
     foods: [curatedFood],
     goalHistory: makeGoalHistory(fallback.todayTargets),
+    hasCompletedGoalSetup: true,
     hiddenFixedMealSourceKeys: {},
     mealsByDate: {},
     nutritionGoalType: 'maintain',
@@ -262,6 +290,7 @@ test('restoreAppDataSnapshot preserves official soondubu curated food and meal n
     fixedMealTemplates: [],
     foods: [soondubuFood],
     goalHistory: makeGoalHistory(fallback.todayTargets),
+    hasCompletedGoalSetup: true,
     hiddenFixedMealSourceKeys: {},
     mealsByDate: { '2026-08-09': [soondubuMeal] },
     nutritionGoalType: 'maintain',
@@ -307,6 +336,7 @@ test('restoreAppDataSnapshot preserves future dataSource values without dropping
     fixedMealTemplates: [],
     foods: [futureFood],
     goalHistory: makeGoalHistory(fallback.todayTargets),
+    hasCompletedGoalSetup: true,
     hiddenFixedMealSourceKeys: {},
     mealsByDate: { '2026-07-23': [futureMeal] },
     nutritionGoalType: 'maintain',
@@ -405,6 +435,7 @@ test('restoreAppDataSnapshot hydrates legacy and invalid fixed meal weekdays as 
     ],
     foods: [food],
     goalHistory: makeGoalHistory(fallback.todayTargets),
+    hasCompletedGoalSetup: true,
     hiddenFixedMealSourceKeys: {},
     mealsByDate: {},
     nutritionGoalType: 'maintain',
@@ -446,6 +477,7 @@ test('restoreAppDataSnapshot normalizes malformed fixed meal weekday arrays with
     ],
     foods: [food],
     goalHistory: makeGoalHistory(fallback.todayTargets),
+    hasCompletedGoalSetup: true,
     hiddenFixedMealSourceKeys: {},
     mealsByDate: {},
     nutritionGoalType: 'maintain',
@@ -497,6 +529,7 @@ test('fixed meal recurrence edits, inactive state, presets, and deletes persist 
     ],
     foods: [food],
     goalHistory: makeGoalHistory(fallback.todayTargets),
+    hasCompletedGoalSetup: true,
     hiddenFixedMealSourceKeys: {},
     mealsByDate: {},
     nutritionGoalType: 'maintain',
