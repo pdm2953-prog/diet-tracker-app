@@ -33,6 +33,10 @@ class Settings(BaseSettings):
         gt=0,
         validation_alias="AUTH_SESSION_ABSOLUTE_TTL_SECONDS",
     )
+    auth_allow_insecure_dev_cookie: bool = Field(
+        default=False,
+        validation_alias="AUTH_ALLOW_INSECURE_DEV_COOKIE",
+    )
     food_provider: str = Field(default="mock", validation_alias="FOOD_PROVIDER")
     fatsecret_api_edition: str = Field(
         default="basic",
@@ -92,6 +96,16 @@ class Settings(BaseSettings):
             raise ValueError("Wildcard CORS origins are not allowed.")
 
         return origins
+
+    @property
+    def auth_session_cookie_name(self) -> str:
+        if self.auth_allow_insecure_dev_cookie:
+            return "diet_tracker_session_dev"
+        return "__Host-diet_tracker_session"
+
+    @property
+    def auth_session_cookie_secure(self) -> bool:
+        return not self.auth_allow_insecure_dev_cookie
 
 
 @lru_cache
