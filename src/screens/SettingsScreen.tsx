@@ -1,30 +1,38 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
+import { GoalHistoryModal } from '../components/GoalHistoryModal';
 import { Card, SecondaryButton, SectionHeader } from '../components/ui';
 import { createSettingsGoalEntryModel } from '../goalPresentation';
+import type { NutritionGoalHistoryEntry } from '../goalHistory';
 import type { DailyNutritionTargets } from '../nutrition';
 import type { NutritionGoalType } from '../nutritionGoals';
 import { styles } from '../styles';
 
 type SettingsScreenProps = {
+  goalHistory: readonly NutritionGoalHistoryEntry[];
   nutritionGoalType: NutritionGoalType;
   onOpenGoalSetup: () => void;
   targets: DailyNutritionTargets;
+  todayDate: string;
 };
 
 export function SettingsScreen({
+  goalHistory,
   nutritionGoalType,
   onOpenGoalSetup,
   targets,
+  todayDate,
 }: SettingsScreenProps) {
+  const [isGoalHistoryVisible, setIsGoalHistoryVisible] = useState(false);
   const goalEntry = useMemo(
     () => createSettingsGoalEntryModel(targets, nutritionGoalType),
     [nutritionGoalType, targets],
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <>
+      <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>Settings</Text>
         <Text style={styles.title}>설정</Text>
@@ -58,6 +66,24 @@ export function SettingsScreen({
               <Text style={styles.settingsGoalActionText}>{goalEntry.resetLabel}</Text>
               <Text style={styles.settingsGoalChevron}>›</Text>
             </View>
+          </Pressable>
+          <Pressable
+            accessibilityLabel="목표 변경 이력 열기"
+            accessibilityRole="button"
+            onPress={() => setIsGoalHistoryVisible(true)}
+            style={({ pressed }) => [
+              styles.settingsGoalHistoryEntry,
+              pressed ? styles.settingsGoalEntryPressed : null,
+            ]}
+            testID="settings-goal-history-entry"
+          >
+            <View style={styles.settingsGoalHistoryTitleBlock}>
+              <Text style={styles.settingsGoalHistoryTitle}>목표 변경 이력</Text>
+              <Text style={styles.settingsGoalHistoryDescription}>
+                적용 날짜와 당시 영양 목표 확인
+              </Text>
+            </View>
+            <Text style={styles.settingsGoalChevron}>›</Text>
           </Pressable>
         </View>
 
@@ -125,7 +151,14 @@ export function SettingsScreen({
           </View>
         </Card>
       </View>
-    </ScrollView>
+      </ScrollView>
+      <GoalHistoryModal
+        goalHistory={goalHistory}
+        onClose={() => setIsGoalHistoryVisible(false)}
+        todayDate={todayDate}
+        visible={isGoalHistoryVisible}
+      />
+    </>
   );
 }
 

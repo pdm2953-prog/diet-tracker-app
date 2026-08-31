@@ -452,9 +452,11 @@ export default function App() {
         </View>
         <View style={[screenPaneStyle, activeTab !== 'settings' ? hiddenScreenPaneStyle : null]}>
           <SettingsScreen
+            goalHistory={goalHistory}
             nutritionGoalType={todayGoal.goalType}
             onOpenGoalSetup={() => setActiveTab(getGoalSetupScreenKey())}
             targets={todayGoal.targets}
+            todayDate={todayDate}
           />
         </View>
       </View>
