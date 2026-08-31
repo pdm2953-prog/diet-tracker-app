@@ -19,6 +19,20 @@ class Settings(BaseSettings):
         default=",".join(DEFAULT_CORS_ORIGINS),
         validation_alias="BACKEND_CORS_ORIGINS",
     )
+    database_url: str = Field(
+        default="sqlite+pysqlite:///./diet_tracker.db",
+        validation_alias="DATABASE_URL",
+    )
+    auth_session_idle_ttl_seconds: int = Field(
+        default=60 * 60 * 24 * 30,
+        gt=0,
+        validation_alias="AUTH_SESSION_IDLE_TTL_SECONDS",
+    )
+    auth_session_absolute_ttl_seconds: int = Field(
+        default=60 * 60 * 24 * 90,
+        gt=0,
+        validation_alias="AUTH_SESSION_ABSOLUTE_TTL_SECONDS",
+    )
     food_provider: str = Field(default="mock", validation_alias="FOOD_PROVIDER")
     fatsecret_api_edition: str = Field(
         default="basic",

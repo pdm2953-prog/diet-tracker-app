@@ -12,6 +12,14 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
+Create or upgrade the local SQLite schema with Alembic before starting the app:
+
+```powershell
+python -m alembic upgrade head
+```
+
+`DATABASE_URL` can point tests or local tools at a different database. Application startup does not create tables automatically. The authentication security contract is documented in `../docs/AUTH.md`.
+
 ## Provider Configuration
 
 `FOOD_PROVIDER` selects the backend implementation:

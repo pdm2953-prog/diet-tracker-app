@@ -58,3 +58,8 @@ backend/**/*.pyo
 backend/*.egg-info/
 backend/**/*.egg-info/
 backend/.pytest_cache/
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+backend/*.sqlite
+backend/*.sqlite3
