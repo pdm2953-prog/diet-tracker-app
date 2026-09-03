@@ -47,9 +47,6 @@ backend/.env.*
 /ios
 /android
 
-# Codex harness generated context
-.codex-harness/
-
 # Python backend
 backend/.venv/
 backend/**/__pycache__/
