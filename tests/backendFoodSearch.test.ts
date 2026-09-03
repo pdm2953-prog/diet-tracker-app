@@ -65,6 +65,7 @@ const backendFoodDto = {
 test('createBackendServiceConfig defaults to the local backend provider', () => {
   const config = createBackendServiceConfig({});
 
+  assert.equal(DEFAULT_BACKEND_URL, 'http://localhost:8000');
   assert.equal(config.baseUrl, DEFAULT_BACKEND_URL);
   assert.equal(config.baseUrlSource, 'default');
   assert.equal(config.foodSearchProvider, 'backend');

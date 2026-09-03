@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   getAppHydrationRenderState,
+  getAppStartupRenderState,
   shouldPersistAppDataSnapshot,
   shouldRenderInteractiveApp,
 } from '../src/appHydration';
@@ -41,6 +42,15 @@ test('hydrated users enter the interactive app only after goal setup completion'
   assert.equal(getAppHydrationRenderState(true, true), 'interactive');
   assert.equal(shouldRenderInteractiveApp(true, true), true);
   assert.equal(shouldPersistAppDataSnapshot(true, true), true);
+});
+
+test('auth gate precedes nutrition hydration and first-run goal setup', () => {
+  assert.equal(getAppStartupRenderState('restoring', false, false), 'auth-loading');
+  assert.equal(getAppStartupRenderState('unavailable', true, true), 'auth-unavailable');
+  assert.equal(getAppStartupRenderState('anonymous', true, false), 'auth-required');
+  assert.equal(getAppStartupRenderState('authenticated', false, false), 'nutrition-loading');
+  assert.equal(getAppStartupRenderState('authenticated', true, false), 'goal-setup');
+  assert.equal(getAppStartupRenderState('authenticated', true, true), 'interactive');
 });
 
 test('scheduled summary badges use a dedicated non-danger tone', () => {

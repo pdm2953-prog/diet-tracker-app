@@ -1,5 +1,5 @@
 export const DEFAULT_BACKEND_TIMEOUT_MS = 5000;
-export const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
+export const DEFAULT_BACKEND_URL = 'http://localhost:8000';
 export const DEFAULT_FOOD_SEARCH_PROVIDER: FoodSearchProviderMode = 'backend';
 
 export type FoodSearchProviderMode = 'mock' | 'backend' | 'backend-with-mock-fallback';

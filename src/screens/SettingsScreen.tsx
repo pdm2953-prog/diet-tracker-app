@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { GoalHistoryModal } from '../components/GoalHistoryModal';
 import { Card, SecondaryButton, SectionHeader } from '../components/ui';
+import type { AuthUser } from '../auth/authClient';
 import { createSettingsGoalEntryModel } from '../goalPresentation';
 import type { NutritionGoalHistoryEntry } from '../goalHistory';
 import type { DailyNutritionTargets } from '../nutrition';
@@ -10,25 +11,38 @@ import type { NutritionGoalType } from '../nutritionGoals';
 import { styles } from '../styles';
 
 type SettingsScreenProps = {
+  authUser: AuthUser | null;
   goalHistory: readonly NutritionGoalHistoryEntry[];
   nutritionGoalType: NutritionGoalType;
+  onLogout: () => Promise<void>;
   onOpenGoalSetup: () => void;
   targets: DailyNutritionTargets;
   todayDate: string;
 };
 
 export function SettingsScreen({
+  authUser,
   goalHistory,
   nutritionGoalType,
+  onLogout,
   onOpenGoalSetup,
   targets,
   todayDate,
 }: SettingsScreenProps) {
   const [isGoalHistoryVisible, setIsGoalHistoryVisible] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const goalEntry = useMemo(
     () => createSettingsGoalEntryModel(targets, nutritionGoalType),
     [nutritionGoalType, targets],
   );
+  const logout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await onLogout();
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <>
@@ -40,6 +54,25 @@ export function SettingsScreen({
       </View>
 
       <View style={styles.settingsStack}>
+        <Card style={styles.settingsSectionCard}>
+          <SectionHeader
+            subtitle="로그아웃해도 이 기기의 기존 식단과 목표는 삭제되거나 계정에 연결되지 않습니다."
+            title="계정"
+          />
+          <View style={styles.settingsList}>
+            <SettingsInfoRow
+              description={authUser?.email ?? '로그인된 계정'}
+              label={authUser?.displayName ?? '사용자'}
+              value="로그인 중"
+            />
+          </View>
+          <SecondaryButton
+            disabled={isLoggingOut}
+            label={isLoggingOut ? '로그아웃 중...' : '로그아웃'}
+            onPress={() => void logout()}
+          />
+        </Card>
+
         <View style={styles.settingsGoalSection}>
           <Text style={styles.settingsGoalSectionTitle}>{goalEntry.title}</Text>
           <Pressable

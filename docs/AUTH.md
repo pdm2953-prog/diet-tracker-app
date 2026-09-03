@@ -1,6 +1,6 @@
 # Authentication
 
-Chapter 6-A establishes the persistence and security primitives. Chapter 6-B adds the HTTP authentication contract. Authentication still does not connect an account to nutrition data.
+Chapter 6-A establishes the persistence and security primitives. Chapter 6-B adds the HTTP authentication contract. Chapter 6-C connects that contract to the frontend. Authentication still does not connect an account to nutrition data.
 
 ## Email identity
 
@@ -58,9 +58,20 @@ Cookie-based `POST /register` and `POST /login` require `application/json`, `X-C
 
 CORS enables credentials only for the explicit `BACKEND_CORS_ORIGINS` allowlist, never `*`. Browser methods are `GET`, `POST`, `DELETE`, and `OPTIONS`; allowed request headers are `Accept`, `Content-Type`, and `X-CSRF-Protection`. `Authorization` and `X-Auth-Transport` are deliberately excluded from the browser CORS allowlist.
 
+## Frontend session lifecycle
+
+- Native register/login explicitly requests bearer transport and persists the raw session token only through `expo-secure-store`. The token is never placed in AsyncStorage, localStorage, or React auth state.
+- Web register/login uses `credentials: include`, the cookie CSRF header, and the server-issued HttpOnly cookie. Browser JavaScript does not persist or read a raw session token.
+- Startup restores authentication and local nutrition data independently. Authentication gates first; an authenticated user then waits for nutrition hydration and sees first-run goal setup when required.
+- A restore `401` clears the native credential before returning to the anonymous gate. For web, the 6-B invalid-cookie response expires the HttpOnly cookie and the frontend returns to the anonymous gate. Network, timeout, and `5xx` failures preserve the credential and expose a retryable unavailable gate.
+- Native logout attempts server revocation, then clears SecureStore regardless of the server result; after local deletion succeeds it clears in-memory auth state. A SecureStore deletion failure stays unavailable so cleanup can be retried. Web logout returns to the anonymous gate only after the server's `204` response; network and `5xx` failures remain unavailable with retry and logout actions because JavaScript cannot delete the HttpOnly cookie.
+- Logout does not delete, claim, merge, or namespace the local nutrition snapshot.
+
+The frontend and food search share `EXPO_PUBLIC_BACKEND_URL`. Default web development uses `http://localhost:8000` so the strict cookie has the same site label as the default Expo web URL. Android emulators must use `http://10.0.2.2:8000`, and physical devices must use the development computer's reachable LAN address in `.env.local`. For device testing, run Uvicorn on `0.0.0.0`, allow the port through the local firewall, and keep the device and computer on the same network. Local HTTP browser auth also requires the explicit backend-only development setting `AUTH_ALLOW_INSECURE_DEV_COOKIE=true`.
+
 ## Data ownership boundary
 
-Account authentication and nutrition dataset ownership/claim are separate concerns. Creating or authenticating an account must not automatically claim, merge, upload, or expose the existing local meal and goal dataset. That ownership flow remains out of scope for Chapters 6-A and 6-B.
+Account authentication and nutrition dataset ownership/claim are separate concerns. Creating or authenticating an account must not automatically claim, merge, upload, or expose the existing local meal and goal dataset. That ownership flow remains out of scope through Chapter 6-C.
 
 ## Infrastructure boundary
 

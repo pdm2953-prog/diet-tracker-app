@@ -9,10 +9,10 @@
 로컬 백엔드 기본 실행 예시는 다음과 같다.
 
 ```text
-http://127.0.0.1:8000
+http://localhost:8000
 ```
 
-프론트엔드는 `EXPO_PUBLIC_BACKEND_URL`로 백엔드 URL을 주입한다. 값이 없으면 개발 기본값 `http://127.0.0.1:8000`을 사용한다. 프론트엔드 음식 검색 provider는 `EXPO_PUBLIC_FOOD_SEARCH_PROVIDER`로 선택한다.
+프론트엔드는 `EXPO_PUBLIC_BACKEND_URL`로 백엔드 URL을 주입한다. 값이 없으면 개발 기본값 `http://localhost:8000`을 사용한다. 프론트엔드 음식 검색 provider는 `EXPO_PUBLIC_FOOD_SEARCH_PROVIDER`로 선택한다.
 
 | 값 | 동작 |
 | --- | --- |

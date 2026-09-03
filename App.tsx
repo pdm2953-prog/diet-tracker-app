@@ -18,9 +18,10 @@ import {
 import { resolveNutritionGoalForDate } from './src/goalHistory';
 import type { NutritionGoalHistoryEntry } from './src/goalHistory';
 import {
-  getAppHydrationRenderState,
+  getAppStartupRenderState,
   shouldPersistAppDataSnapshot,
 } from './src/appHydration';
+import { useAuth } from './src/auth/useAuth';
 import { saveNutritionGoal } from './src/goalSetup';
 import { getMealsForDate, hasValidGramServing, normalizeConsumedGrams } from './src/meals';
 import { bottomTabs, getGoalSetupScreenKey } from './src/navigation';
@@ -41,6 +42,7 @@ import type { DailyNutritionTargets } from './src/nutrition';
 import type { NutritionGoalType } from './src/nutritionGoals';
 import { BottomTabItem } from './src/components/ui';
 import { CalendarScreen } from './src/screens/CalendarScreen';
+import { AuthScreen, AuthUnavailableScreen } from './src/screens/AuthScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { TargetScreen } from './src/screens/TargetScreen';
 import { TodayScreen } from './src/screens/TodayScreen';
@@ -106,6 +108,7 @@ function mergeFoodsById(foods: Food[], fixedMealTemplates: FixedMealTemplate[]):
 }
 
 export default function App() {
+  const auth = useAuth();
   const [initialAppState] = useState(createInitialAppState);
   const [activeTab, setActiveTab] = useState<ScreenKey>('today');
   const [selectedDate, setSelectedDate] = useState(initialAppState.selectedDate);
@@ -376,12 +379,47 @@ export default function App() {
     }
   };
 
-  const appRenderState = getAppHydrationRenderState(
+  const appRenderState = getAppStartupRenderState(
+    auth.state.status,
     storageLoaded,
     hasCompletedGoalSetup,
   );
 
-  if (appRenderState === 'loading') {
+  if (appRenderState === 'auth-loading') {
+    return (
+      <SafeAreaView style={styles.root}>
+        <StatusBar style="dark" />
+        <View style={styles.loadingScreen}>
+          <Text style={styles.loadingTitle}>로그인 상태를 확인하는 중</Text>
+          <Text style={styles.loadingText}>안전하게 계정 정보를 불러오고 있습니다.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (appRenderState === 'auth-unavailable' && auth.state.status === 'unavailable') {
+    return (
+      <SafeAreaView style={styles.root}>
+        <StatusBar style="dark" />
+        <AuthUnavailableScreen
+          message={auth.state.message}
+          onLogout={auth.logout}
+          onRetry={auth.retryRestore}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (appRenderState === 'auth-required') {
+    return (
+      <SafeAreaView style={styles.root}>
+        <StatusBar style="dark" />
+        <AuthScreen onLogin={auth.login} onRegister={auth.register} />
+      </SafeAreaView>
+    );
+  }
+
+  if (appRenderState === 'nutrition-loading') {
     return (
       <SafeAreaView style={styles.root}>
         <StatusBar style="dark" />
@@ -452,8 +490,10 @@ export default function App() {
         </View>
         <View style={[screenPaneStyle, activeTab !== 'settings' ? hiddenScreenPaneStyle : null]}>
           <SettingsScreen
+            authUser={auth.state.status === 'authenticated' ? auth.state.user : null}
             goalHistory={goalHistory}
             nutritionGoalType={todayGoal.goalType}
+            onLogout={auth.logout}
             onOpenGoalSetup={() => setActiveTab(getGoalSetupScreenKey())}
             targets={todayGoal.targets}
             todayDate={todayDate}
