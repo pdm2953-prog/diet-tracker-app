@@ -7,9 +7,10 @@ description: Windows PowerShell Codex-native review gate with P1/P2/P3 findings,
 
 ## Purpose
 
-Run the current Chapter's structured review, remediation, validation, and final
-gate inside Codex. This skill is the source of truth for review scope,
-severity, environment blockers, and gate reporting.
+Run the current Subchapter's structured review, remediation, validation, and
+final gate inside Codex. A Subchapter is the gate/commit work unit; its Major
+Chapter is the Codex session boundary. This skill is the source of truth for
+review scope, severity, environment blockers, and gate reporting.
 
 The supported mode is:
 
@@ -39,27 +40,27 @@ Always report the final result in Korean.
 
 Perform a read-only review and create P1, P2, and P3 findings.
 
-Review all current Chapter changes relative to `HEAD`, including:
+Review all current Subchapter changes relative to `HEAD`, including:
 
 - staged changes
 - unstaged changes
 - untracked files
 
 Committed branch and base-branch data may be used as supporting context only.
-Do not substitute it for the complete `HEAD`-relative Chapter scope.
+Do not substitute it for the complete `HEAD`-relative Subchapter scope.
 
 ### Phase 3 - Remediation
 
 Run this phase only when P1 or P2 findings exist, or when the user explicitly
 promotes a P3 finding to a blocker.
 
-In the same Chapter session, make the smallest correction that resolves each
-blocking finding. Add or strengthen regression tests when needed to prove the
-fix. Do not broaden the Chapter scope.
+In the same Major Chapter session, make the smallest correction that resolves
+each blocking finding. Add or strengthen regression tests when needed to prove
+the fix. Do not broaden the Subchapter scope.
 
 ### Phase 4 - Re-review
 
-After remediation, collect and review the entire updated Chapter diff again.
+After remediation, collect and review the entire updated Subchapter diff again.
 Do not review only the latest patch.
 
 Repeat remediation and re-review until no blocking code finding remains or a
@@ -68,7 +69,7 @@ real blocker prevents further progress.
 ### Phase 5 - Validation
 
 Run the repository's final harness baseline from `AGENTS.md` and every
-Chapter-specific required validation. Record each command as PASS, FAIL, or
+Subchapter-specific required validation. Record each command as PASS, FAIL, or
 BLOCKED with a concise result.
 
 ### Phase 6 - Gate
@@ -97,13 +98,13 @@ A release-blocking correctness or safety issue, including:
 
 ### P2
 
-A meaningful violation of required Chapter behavior, including:
+A meaningful violation of required Subchapter behavior, including:
 
 - a meaningful functional regression
 - missing or incorrect required behavior
 - an important persistence, migration, date, or state error
 - a major integration or regression gap
-- failure to satisfy the current Chapter contract
+- failure to satisfy the current Subchapter contract
 
 ### P3
 
@@ -146,8 +147,10 @@ This skill is Codex-native. Never call or spawn:
 PowerShell helpers are deterministic collectors only. They do not call a model,
 judge severity, run validation, remediate findings, or decide the gate.
 
-The harness does not start the next Chapter and does not stage or commit files.
-At `READY_TO_COMMIT`, Codex stops. The user owns staging and committing.
+The harness does not start the next Subchapter or Major Chapter and does not
+stage or commit files. At `READY_TO_COMMIT`, Codex stops. The user owns staging
+and committing. After the user commits and confirms a clean tree, continue any
+remaining Subchapter in the same Major Chapter session.
 
 ## Final output contract
 
@@ -166,13 +169,13 @@ Validation:
 - npx tsc --noEmit: <PASS | FAIL | BLOCKED and concise result>
 - backend pytest: <PASS | FAIL | BLOCKED and concise result>
 - git diff --check: <PASS | FAIL | BLOCKED and concise result>
-- Chapter-specific: <PASS | FAIL | BLOCKED | none and concise result>
+- Subchapter-specific: <PASS | FAIL | BLOCKED | none and concise result>
 
 Environment/Tooling Blockers:
 - <details, or none>
 
 GATE: PASS | BLOCKED
-Chapter: READY_TO_COMMIT | BLOCKED
+Subchapter: READY_TO_COMMIT | BLOCKED
 ```
 
 ## Windows review checklist

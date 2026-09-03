@@ -21,8 +21,8 @@ Do not use Bash syntax unless the user explicitly asks for Bash.
 
 ## Project scope discipline
 
-- Keep implementation within the Chapter's requested product and workflow
-  scope.
+- Keep implementation within the current Subchapter's requested product and
+  workflow scope.
 - Do not expand backend or frontend scope without an explicit requirement or
   evidence that the requested behavior requires it.
 - Do not mix product feature changes and workflow-maintenance changes in the
@@ -32,10 +32,10 @@ Do not use Bash syntax unless the user explicitly asks for Bash.
 - For normal application work, ignore `.agents/skills/` unless harness work is
   explicitly in scope. For harness maintenance, `.agents/skills/` is in scope.
 
-## Chapter workflow
+## Subchapter workflow
 
-Follow the Global AGENTS lifecycle without duplicating it here. The repository
-sequence is:
+Follow the Global AGENTS Major Chapter session lifecycle without duplicating it
+here. Each Subchapter uses this repository sequence:
 
 ```text
 implementation
@@ -56,11 +56,12 @@ should ideally be only:
 
 ```text
 $codex-harness
-Chapter X final gate.
+Subchapter 6-A final gate.
 ```
 
-The user owns staging and committing. A Chapter is not complete until the user
-commits and confirms a clean working tree.
+The user owns staging and committing. A Subchapter is not complete until the
+user commits and confirms a clean working tree. If another Subchapter remains,
+continue it in the same Major Chapter session.
 
 ## Validation policy
 
@@ -77,7 +78,7 @@ git diff --check
 git status --short
 ```
 
-Add Chapter-specific validation when the Chapter contract requires it. If a
-required validation cannot run, apply the `$codex-harness`
+Add Subchapter-specific validation when the Subchapter contract requires it. If
+a required validation cannot run, apply the `$codex-harness`
 Environment/Tooling Blocker contract.
 
